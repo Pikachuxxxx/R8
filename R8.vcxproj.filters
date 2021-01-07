@@ -42,6 +42,9 @@
     <ClInclude Include="source\rasterizer\r8_color_palette.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_external_math.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="include\r8_constants.h">
@@ -51,6 +54,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_color_palette.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\rasterizer\r8_external_math.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
