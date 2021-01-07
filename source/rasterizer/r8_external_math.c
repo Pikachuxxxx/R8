@@ -51,7 +51,7 @@ R8float r8ApproxFastInvSqrt(R8float x)
     float x2 = x * 0.5f;
     float y = x;
     long i = *(long*)(&y);          // Evil floating point bit level hacking
-    i = 0x5f3759df - (i >> 1);      // Magic number
+    i = 0x5f3759df - (i >> 1);      // Magic number (What the fuck is happening???)
     y = *(float*)(&i);
     y = y * (1.5f - (x2 * y * y));  // 1st iteration
     return y;

@@ -39,7 +39,7 @@
 #define R8_DEBUG
 
 /// 32-bit interpolation type.
-typedef float PRinterp;
+typedef float R8interp;
 #define R8_FLOAT(x) x##f
 
 #endif 
