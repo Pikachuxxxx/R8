@@ -89,5 +89,8 @@
     <ClCompile Include="source\rasterizer\r8_matrix4.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="source\rasterizer\r8_vertexbuffer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

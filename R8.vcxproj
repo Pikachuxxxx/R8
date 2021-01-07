@@ -145,6 +145,7 @@
     <ClCompile Include="source\rasterizer\r8_external_math.c" />
     <ClCompile Include="source\rasterizer\r8_matrix4.c" />
     <ClCompile Include="source\rasterizer\r8_vertex.c" />
+    <ClCompile Include="source\rasterizer\r8_vertexbuffer.c" />
     <ClCompile Include="source\rasterizer\r8_viewport.c" />
   </ItemGroup>
   <ItemGroup>
