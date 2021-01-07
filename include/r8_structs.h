@@ -77,11 +77,11 @@ R8void r8Vec4Normalize(R8Vec4* vec4)
         vec4->w *= len;
     }
 }
-//------------------------Vertex--------------------------
-// Position (x, y, z) | Texture Coordinates (s, t) | Color (r, g, b, a)
-typedef struct R8Vertex
-{
-    R8float x, y, z, s, t, r, g, b, a;
-}R8Vertex;
+////------------------------Vertex--------------------------
+//// Position (x, y, z) | Texture Coordinates (s, t) | Color (r, g, b, a)
+//typedef struct R8Vertex
+//{
+//    R8float x, y, z, s, t, r, g, b, a;
+//}R8Vertex;
 
 #endif
