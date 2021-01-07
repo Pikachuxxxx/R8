@@ -142,6 +142,7 @@
     <ClCompile Include="include\r8_constants.h" />
     <ClCompile Include="source\rasterizer\r8.c" />
     <ClCompile Include="source\rasterizer\r8_color_palette.c" />
+    <ClCompile Include="source\rasterizer\r8_external_math.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\r8.h" />
@@ -153,6 +154,7 @@
     <ClInclude Include="source\rasterizer\r8_color.h" />
     <ClInclude Include="source\rasterizer\r8_color_palette.h" />
     <ClInclude Include="source\rasterizer\r8_config.h" />
+    <ClInclude Include="source\rasterizer\r8_external_math.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
