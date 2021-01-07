@@ -140,9 +140,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="include\r8_constants.h" />
-    <ClCompile Include="source\rasterizer\r8.c" />
+    <ClCompile Include="source\r8.c" />
     <ClCompile Include="source\rasterizer\r8_color_palette.c" />
     <ClCompile Include="source\rasterizer\r8_external_math.c" />
+    <ClCompile Include="source\rasterizer\r8_matrix4.c" />
     <ClCompile Include="source\rasterizer\r8_vertex.c" />
     <ClCompile Include="source\rasterizer\r8_viewport.c" />
   </ItemGroup>
@@ -158,6 +159,7 @@
     <ClInclude Include="source\rasterizer\r8_color_palette.h" />
     <ClInclude Include="source\rasterizer\r8_config.h" />
     <ClInclude Include="source\rasterizer\r8_external_math.h" />
+    <ClInclude Include="source\rasterizer\r8_matrix4.h" />
     <ClInclude Include="source\rasterizer\r8_memory.h" />
     <ClInclude Include="source\rasterizer\r8_pixel.h" />
     <ClInclude Include="source\rasterizer\r8_vertex.h" />

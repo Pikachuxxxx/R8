@@ -63,12 +63,12 @@
     <ClInclude Include="source\rasterizer\r8_vertexbuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_matrix4.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="include\r8_constants.h">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\rasterizer\r8.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_color_palette.c">
@@ -81,6 +81,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_viewport.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\r8.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\rasterizer\r8_matrix4.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
