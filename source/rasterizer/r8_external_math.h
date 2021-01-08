@@ -55,4 +55,6 @@ R8float r8ApproxCos(R8float x);
 /// Calculate the approximated and fast value for inverse square root
 R8float r8ApproxFastInvSqrt(R8float x);
 
+R8int r8ApproxIntLog2(R8float x);
+
 #endif

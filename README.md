@@ -1,4 +1,4 @@
-![](https://github.com/Pikachuxxxx/R8/blob/master/resources/Branding%20/R8-Tw.png)
+![](https://github.com/Pikachuxxxx/R8/blob/dev/resources/Branding/R8-Tw.png)
 
 # About
 R8 is a simple and easy to use 8-bit Rendering and Rasterization API written in C. The design is similar to and inspired by OpenGL1.1. 

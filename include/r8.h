@@ -12,7 +12,7 @@ extern "C" {
 #endif //  _cplusplus
 
 #include "r8_constants.h"
-#include "r8_errors.h"
+#include "r8_error_codes.h"
 #include "r8_macros.h"
 #include "r8_platform.h"
 #include "r8_structs.h"
@@ -37,6 +37,9 @@ R8enum r8GetError();
 
 /// Get the errors of render state or API calls
 const char* r8GetString();
+
+/// Sets the error handler callback
+//R8void r8ErrorHandle(R8_ERROR_HANDLER_PROC errorHandler);
 
 /****************************************************
  *                                                  *
