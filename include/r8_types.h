@@ -13,7 +13,7 @@
 #define R8_FALSE    0
 
 typedef void            R8void;
-typedef void*           R8Object;
+typedef void*           R8object;
 typedef char            R8bool;
 typedef char            R8byte;
 typedef unsigned char   R8ubyte;
