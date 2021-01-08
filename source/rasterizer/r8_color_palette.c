@@ -8,6 +8,13 @@
 
 R8void r8FillColorPalette(R8ColorPalette* palette)
 {
+
+    if (palette == NULL)
+    {
+        R8_ERROR(R8_ERROR_NULL_POINTER);
+        return;
+    }
+
     R8Color* color = palette->colors;
 
     // Color palettes for 3 and 2 bit color components

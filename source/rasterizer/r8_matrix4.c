@@ -126,6 +126,9 @@ R8void r8Mat4Scale(R8Mat4* result, R8float x, R8float y, R8float z)
 
 R8void r8Mat4Perspective(R8Mat4* result, R8float fov, R8float aspectRatio, R8float nearPlane, R8float farPlane)
 {
+
+    R8_ERROR(R8_ERROR_NULL_POINTER);
+
     const R8float h = 1.0f / tanf(fov * 0.5f);
     const R8float w = h / aspectRatio;
 
@@ -154,6 +157,9 @@ R8void r8Mat4Perspective(R8Mat4* result, R8float fov, R8float aspectRatio, R8flo
 
 R8void r8Mat4Orthographic(R8Mat4* result, R8float left, R8float right, R8float top, R8float bottom, R8float nearPlane, R8float farPlanet)
 {
+
+    R8_ERROR(R8_ERROR_NULL_POINTER);
+
     R8float* m = &(result->elements[0][0]);
     
     R8float width = left - right;

@@ -1,4 +1,4 @@
-/* r8_pixel.h
+/* r8_vertex.h
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.

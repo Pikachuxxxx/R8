@@ -18,5 +18,6 @@ R8void r8InitViewport(R8Viewport* viewport)
         viewport->minDepth = 0.0f;
         viewport->maxDepth = 1.0f;
         viewport->depthSize = 1.0f;
-    }
+    else
+        R8_ERROR(R8_ERROR_NULL_POINTER);
 }
