@@ -434,84 +434,237 @@ R8void r8RenderLinesIndexed(R8sizei numVertices, R8sizei firstVertex, const R8Ve
 
 static R8void render_screenspace_image_textured(const R8Texture* texture, R8int left, R8int top, R8int right, R8int bottom)
 {
-    pr_framebuffer* frameBuffer = PR_STATE_MACHINE.boundFrameBuffer;
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
 
     // Clamp rectangle
-    left = PR_CLAMP(left, 0, (PRint)frameBuffer->width - 1);
-    top = PR_CLAMP(top, 0, (PRint)frameBuffer->height - 1);
-    right = PR_CLAMP(right, 0, (PRint)frameBuffer->width - 1);
-    bottom = PR_CLAMP(bottom, 0, (PRint)frameBuffer->height - 1);
+    left    = R8_CLAMP(left,    0, (R8int)frameBuffer->width - 1);
+    top     = R8_CLAMP(top,     0, (R8int)frameBuffer->height - 1);
+    right   = R8_CLAMP(right,   0, (R8int)frameBuffer->width - 1);
+    bottom  = R8_CLAMP(bottom,  0, (R8int)frameBuffer->height - 1);
 
     // Flip vertical
-    #ifdef PR_ORIGIN_LEFT_TOP
-    top = frameBuffer->height - top - 1;
-    bottom = frameBuffer->height - bottom - 1;
+    #ifdef R8_ORIGIN_TOP_LEFT
+        top = frameBuffer->height - top - 1;
+        bottom = frameBuffer->height - bottom - 1;
     #endif
 
     if (top > bottom)
-        PR_SWAP(PRint, top, bottom);
+        R8_SWAP(PRint, top, bottom);
     if (left > right)
-        PR_SWAP(PRint, left, right);
+        R8_SWAP(PRint, left, right);
 
     // Select MIP level
-    PRtexsize width = 0, height = 0;
-    PRubyte mipLevel = 0;//_pr_texture_compute_miplevel(texture, 1.0f / (PRfloat)(right - left), 0.0f, 0.0f, 1.0f / (PRfloat)(bottom - top));
-    const PRcolorindex* texels = _pr_texture_select_miplevel(texture, mipLevel, &width, &height);
+    R8texturesize width = 0, height = 0;
+    R8ubyte mipLevel = 0;//r8TextureComputeMipMapLevel(texture, 1.0f / (R8float)(right - left), 0.0f, 0.0f, 1.0f / (R8float)(bottom - top));
+    const R8ColorBuffer* texels = r8TextureSelectMipmapLevel(texture, mipLevel, &width, &height);
 
     // Rasterize rectangle
-    pr_pixel* pixels = frameBuffer->pixels;
-    const PRuint pitch = frameBuffer->width;
-    pr_pixel* scanline;
+    R8Pixel* pixels = frameBuffer->pixels;
+    const R8uint pitch = frameBuffer->width;
+    R8Pixel* scanline;
 
-    PRfloat u = 0.0f;
-    #ifdef PR_ORIGIN_LEFT_TOP
-    PRfloat v = 1.0f;
+    R8float u = 0.0f;
+    #ifdef R8_ORIGIN_TOP_LEFT
+        R8float v = 1.0f;
     #else
-    PRfloat v = 0.0f;
+        R8float v = 0.0f;
     #endif
 
-    const PRfloat uStep = 1.0f / ((PRfloat)(right - left));
-    const PRfloat vStep = 1.0f / ((PRfloat)(bottom - top));
+    const R8float uStep = 1.0f / ((R8float)(right - left));
+    const R8float vStep = 1.0f / ((R8float)(bottom - top));
 
-    for (PRint y = top; y <= bottom; ++y)
+    for (R8int y = top; y <= bottom; ++y)
     {
         scanline = pixels + (y * pitch + left);
 
         u = 0.0f;
 
-        for (PRint x = left; x <= right; ++x)
+        for (R8int x = left; x <= right; ++x)
         {
-            PRcolorindex color = _pr_texture_sample_nearest_from_mipmap(texels, width, height, u, v);
+            R8ColorBuffer color = r8TextureSampleFromNearestMipmap(texels, width, height, u, v);
 
-            #ifdef PR_BLACK_IS_ALPHA
+            #ifdef R8_BLACK_TO_TRANSPARENCY
             #   ifdef PR_COLOR_BUFFER_24BIT
             if (color.r != 0 || color.g != 0 || color.b != 0)
             {
-                #   else
+            #   else
             if (color != 0)
             {
-                #   endif
-                #endif
+            #   endif
+            #endif
 
                 scanline->colorIndex = color;
 
-                #ifdef PR_BLACK_IS_ALPHA
+            #ifdef R8_BLACK_TO_TRANSPARENCY
             }
             #endif
 
             ++scanline;
             u += uStep;
-            }
+        }
 
-        #ifdef PR_ORIGIN_LEFT_TOP
+        #ifdef R8_ORIGIN_TOP_LEFT
         v -= vStep;
         #else
         v += vStep;
         #endif
+    }
+}
+
+static R8void render_screenspace_image_colored(R8ColorBuffer colorIndex, R8int left, R8int top, R8int right, R8int bottom)
+{
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+
+    // Clamp rectangle
+    left    = R8_CLAMP(left,    0, (R8int)frameBuffer->width - 1);
+    top     = R8_CLAMP(top,     0, (R8int)frameBuffer->height - 1);
+    right   = R8_CLAMP(right,   0, (R8int)frameBuffer->width - 1);
+    bottom  = R8_CLAMP(bottom,  0, (R8int)frameBuffer->height - 1);
+
+    // Flip vertical
+    #ifdef R8_ORIGIN_TOP_LEFT
+    top = frameBuffer->height - top - 1;
+    bottom = frameBuffer->height - bottom - 1;
+    #endif
+
+    if (top > bottom)
+        R8_SWAP(PRint, top, bottom);
+    if (left > right)
+        R8_SWAP(PRint, left, right);
+
+    // Rasterize rectangle
+    R8Pixel* pixels = frameBuffer->pixels;
+    const R8uint pitch = frameBuffer->width;
+    R8Pixel* scanline;
+
+    for (R8int y = top; y <= bottom; ++y)
+    {
+        scanline = pixels + (y * pitch + left);
+        for (R8int x = left; x <= right; ++x)
+        {
+            scanline->colorIndex = colorIndex;
+            ++scanline;
         }
+    }
 }
 
 R8void r8RenderScreenSpaceImage(R8int left, R8int top, R8int right, R8int bottom)
 {
-
+    if (R8_STATE_MACHINE.framebuffer != NULL)
+    {
+        if (R8_STATE_MACHINE.texture != NULL)
+            render_screenspace_image_textured(R8_STATE_MACHINE.texture, left, top, right, bottom);
+        else
+            render_screenspace_image_colored(R8_STATE_MACHINE.color0, left, top, right, bottom);
+    }
+    else
+        R8_ERROR(R8_ERROR_INVALID_STATE);
 }
+
+/********** Triangles **********/
+
+// Calculate the vertex 'c' which is cliped between the vertices 'a' and 'b' and the plane 'z'
+
+static R8ClipVertex get_z_plane_vertex(R8ClipVertex a, R8ClipVertex b, R8loat z)
+{
+    R8interp m = ((R8interp)(z - b.z)) / (a.z - b.z);
+    R8ClipVertex c;
+
+    c.x = (R8float)(m * (a.x - b.x) + b.x);
+    c.y = (R8float)(m * (a.y - b.y) + b.y);
+    c.z = z;
+    c.w = (R8float)(m * (a.w - b.w) + b.w);
+
+    c.u = (R8float)(m * (a.u - b.u) + b.u);
+    c.v = (R8float)(m * (a.v - b.v) + b.v);
+
+    return c;
+}
+
+// Clips the polygon at the z planes
+static R8void polygon_z_clipping(R8float zMin, R8float zMax)
+{
+    R8int x, y;
+
+    // Clip at near clipping plane (zMin)
+    R8int localNumVerts = 0;
+
+    for (x = _numPolyVerts - 1, y = 0; y < _numPolyVerts; x = y, ++y)
+    {
+        // Inside
+        if (clipVertices_[x].z >= zMin && clipVertices_[y].z >= zMin)
+            clipVerticesTemp_[localNumVerts++] = clipVertices_[y];
+
+        // Leaving
+        if (clipVertices_[x].z >= zMin && clipVertices_[y].z < zMin)
+            clipVerticesTemp_[localNumVerts++] = get_z_plane_vertex(clipVertices_[x], clipVertices_[y], zMin);
+
+        // Entering
+        if (clipVertices_[x].z < zMin && clipVertices_[y].z >= zMin)
+        {
+            clipVerticesTemp_[localNumVerts++] = get_z_plane_vertex(clipVertices_[x], clipVertices_[y], zMin);
+            clipVerticesTemp_[localNumVerts++] = clipVertices_[y];
+        }
+    }
+
+    // Clip at far clipping plane (zMax)
+    numPolyVertices_ = 0;
+
+    for (x = localNumVerts - 1, y = 0; y < localNumVerts; x = y, ++y)
+    {
+        // Inside
+        if (clipVerticesTemp_[x].z <= zMax && clipVerticesTemp_[y].z <= zMax)
+            clipVertices_[_numPolyVerts++] = clipVerticesTemp_[y];
+
+        // Leaving
+        if (clipVerticesTemp_[x].z <= zMax && clipVerticesTemp_[y].z > zMax)
+            clipVertices_[_numPolyVerts++] = get_z_plane_vertex(clipVerticesTemp_[x], clipVerticesTemp_[y], zMax);
+
+        // Entering
+        if (clipVerticesTemp_[x].z > zMax && clipVerticesTemp_[y].z <= zMax)
+        {
+            clipVertices_[_numPolyVerts++] = get_z_plane_vertex(clipVerticesTemp_[x], clipVerticesTemp_[y], zMax);
+            clipVertices_[_numPolyVerts++] = clipVerticesTemp_[y];
+        }
+    }
+}
+
+// Computes the vertex 'c' which is cliped between the vertices 'a' and 'b' and the plane 'x'
+static R8RasterVertex get_xplane_vertex(R8RasterVertex a, R8RasterVertex b, R8int x)
+{
+    R8inter m = ((PRinterp)(x - b.x)) / (a.x - b.x);
+    R8RasterVertex c;
+
+    c.x = x;
+    c.y = (PRint)(m * (a.y - b.y) + b.y);
+    c.z = m * (a.z - b.z) + b.z;
+
+    c.u = m * (a.u - b.u) + b.u;
+    c.v = m * (a.v - b.v) + b.v;
+
+    return c;
+}
+
+// Computes the vertex 'c' which is cliped between the vertices 'a' and 'b' and the plane 'y'
+static R8RasterVertex get_yplane_vertex(R8RasterVertex a, R8RasterVertex b, R8int y)
+{
+    R8interp m = ((PRinterp)(y - b.y)) / (a.y - b.y);
+    R8RasterVertex c;
+
+    c.x = (PRint)(m * (a.x - b.x) + b.x);
+    c.y = y;
+    c.z = m * (a.z - b.z) + b.z;
+
+    c.u = m * (a.u - b.u) + b.u;
+    c.v = m * (a.v - b.v) + b.v;
+
+    return c;
+}
+
+
+
+
+
+
+
+/******************************************************************************/
