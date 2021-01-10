@@ -23,6 +23,6 @@ typedef struct R8Vertex
     #endif
 }R8Vertex;
 
-R8void r8InitVertex(R8Vertex vertex);
+R8void r8InitVertex(R8Vertex* vertex);
 
 #endif

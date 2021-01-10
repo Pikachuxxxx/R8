@@ -5,8 +5,11 @@
  */
 
 #include "r8_matrix4.h"
+#include "r8_error.h"
+#include "r8_external_math.h"
 
-
+#include <math.h>
+#include <string.h>
 
 R8void r8Mat4LoadIdentity(R8Mat4* matrix)
 {
@@ -21,14 +24,14 @@ R8void r8Mat4Copy(R8Mat4* dst, R8Mat4* src)
     memcpy(dst, src, sizeof(R8Mat4));
 }
 
-R8void r8Mat4MultiplyFloat3(R8float* result, const R8Mat4* lhs, R8Mat4* rhs)
+R8void r8Mat4MultiplyFloat3(R8float* result, const R8Mat4* lhs, const R8float* rhs)
 {
     result[0] = (lhs->elements[0][0] * rhs[0]) + (lhs->elements[1][0] * rhs[1]) + (lhs->elements[2][0] * rhs[2]) + lhs->elements[3][0];
     result[1] = (lhs->elements[0][1] * rhs[0]) + (lhs->elements[1][1] * rhs[1]) + (lhs->elements[2][1] * rhs[2]) + lhs->elements[3][1];
     result[2] = (lhs->elements[0][2] * rhs[0]) + (lhs->elements[1][2] * rhs[1]) + (lhs->elements[2][2] * rhs[2]) + lhs->elements[3][2];
 }
 
-R8void r8Mat4MultiplyFloat4(R8float* result, const R8Mat4* lhs, R8Mat4* rhs)
+R8void r8Mat4MultiplyFloat4(R8float* result, const R8Mat4* lhs, const R8float* rhs)
 {
     result[0] = (lhs->elements[0][0] * rhs[0]) + (lhs->elements[1][0] * rhs[1]) + (lhs->elements[2][0] * rhs[2]) + (lhs->elements[3][0] * rhs[3]);
     result[1] = (lhs->elements[0][1] * rhs[0]) + (lhs->elements[1][1] * rhs[1]) + (lhs->elements[2][1] * rhs[2]) + (lhs->elements[3][1] * rhs[3]);
@@ -126,8 +129,8 @@ R8void r8Mat4Scale(R8Mat4* result, R8float x, R8float y, R8float z)
 
 R8void r8Mat4Perspective(R8Mat4* result, R8float fov, R8float aspectRatio, R8float nearPlane, R8float farPlane)
 {
-
-    R8_ERROR(R8_ERROR_NULL_POINTER);
+    if(result == NULL)
+        R8_ERROR(R8_ERROR_NULL_POINTER); return;
 
     const R8float h = 1.0f / tanf(fov * 0.5f);
     const R8float w = h / aspectRatio;
@@ -155,10 +158,10 @@ R8void r8Mat4Perspective(R8Mat4* result, R8float fov, R8float aspectRatio, R8flo
     m[15] = 0.0f;
 }
 
-R8void r8Mat4Orthographic(R8Mat4* result, R8float left, R8float right, R8float top, R8float bottom, R8float nearPlane, R8float farPlanet)
+R8void r8Mat4Orthographic(R8Mat4* result, R8float left, R8float right, R8float top, R8float bottom, R8float nearPlane, R8float farPlane)
 {
-
-    R8_ERROR(R8_ERROR_NULL_POINTER);
+    if (result == NULL)
+        R8_ERROR(R8_ERROR_NULL_POINTER); return;
 
     R8float* m = &(result->elements[0][0]);
     

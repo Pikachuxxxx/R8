@@ -7,15 +7,14 @@
 #ifndef R_8_STATE_MACHINE_H
 #define R_8_STATE_MACHINE_H
 
-#include "r8_types.h"
-#include "r8_macros.h"
 #include "r8_viewport.h"
+#include "r8_quad.h"
 #include "r8_framebuffer.h"
 #include "r8_vertexbuffer.h"
-#include "r8_indexbuffer.h"
 #include "r8_texture.h"
-#include "r8_quad.h"
+#include "r8_macros.h"
 #include "r8_matrix4.h"
+#include "r8_indexbuffer.h"
 
 #define R8_STATE_MACHINE    (*stateMachine_)
 #define R8_NUM_STATES       2
@@ -26,6 +25,7 @@ typedef struct R8StateMachine
     R8Mat4              projectionMatrix;
     R8Mat4              viewMatrix;
     R8Mat4              modelMatrix;
+    R8Mat4              viewProjectionMatrix;
     R8Mat4              modelViewMatrix;
     R8Mat4              MVPMatrix;
 
@@ -55,8 +55,8 @@ typedef struct R8StateMachine
 
 extern R8StateMachine* stateMachine_;
 
-R8void r8AddSMRef(R8object* ref);
-R8void r8ReleaseSMRef(R8object* ref);
+R8void r8AddSMRef(R8object object);
+R8void r8ReleaseSMRef(R8object object);
 R8void r8AssertSMRef(R8StateMachine* stateMachine);
 
 R8void r8InitStateMachine(R8StateMachine* stateMachine);
@@ -64,7 +64,7 @@ R8void r8InitNullStateMachine();
 
 R8void r8StateMachineMakeCurrent(R8StateMachine* stateMachine);
 
-R8void r8StateMachineSetState(R8enum cap, PRboolean state);
+R8void r8StateMachineSetState(R8enum cap, R8bool state);
 R8bool r8StateMachineGetState(R8enum cap);
 
 R8void r8StateMachineSetTexenvi(R8enum param, R8int value);

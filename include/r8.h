@@ -48,16 +48,16 @@ const char* r8GetString();
  ****************************************************/
 
 /// Create the Context
-R8Object r8CreateContext(const R8ContextDesc* contextDesc, R8int width, R8int height);
+R8object r8CreateContext(const R8ContextDesc* contextDesc, R8int width, R8int height);
 
 /// Delete the context
-R8void r8DeleteContext(R8Object contextObject);
+R8void r8DeleteContext(R8object contextObject);
 
 /// Make the context active
-R8void r8MakeContextCurrent(R8Object context);
+R8void r8MakeContextCurrent(R8object context);
 
 /// Present the currently bound frame buffer in the current render context
-R8void r8RenderPass(R8Object context);
+R8void r8RenderPass(R8object context);
 
 /****************************************************
  *                                                  *
@@ -66,16 +66,16 @@ R8void r8RenderPass(R8Object context);
  ****************************************************/
 
 /// Creates the Frame Buffer object 
-R8Object r8CreateFrameBuffer(R8int width, R8int height);
+R8object r8CreateFrameBuffer(R8int width, R8int height);
 
 /// deletes the frame buffer object 
-R8void r8DeleteFrameBuffer(R8Object fbo);
+R8void r8DeleteFrameBuffer(R8object fbo);
 
 /// Binds the specified frame buffer to the current render context 
-R8void r8BindFrameBuffer(R8Object fbo);
+R8void r8BindFrameBuffer(R8object fbo);
 
 /// Clear the specified frame buffer and its internal flags
-R8void r8ClearFrameBuffer(R8Object fbo, R8int depthMaskValue, R8bit clearFlags);
+R8void r8ClearFrameBuffer(R8object fbo, R8int depthMaskValue, R8bit clearFlags);
 
 /****************************************************
  *                                                  *
@@ -84,17 +84,17 @@ R8void r8ClearFrameBuffer(R8Object fbo, R8int depthMaskValue, R8bit clearFlags);
  ****************************************************/
 
 /// Creates a vertex buffer to hold the vertex data
-R8Object r8CreateVertexBuffer();
+R8object r8CreateVertexBuffer();
 
 /// Deletes the specified vertex buffer object
-R8void r8DeleteVertxBuffer(R8Object vbo);
+R8void r8DeleteVertxBuffer(R8object vbo);
 
 /// Add data to the vertex buffer
 // TODO: Use vector types instead of (void *)
-R8void r8VertexBufferData(R8Object vbo, const R8void* vertices, const R8void* texCoords, const R8void* color, R8sizei stride, R8sizei numVerts);
+R8void r8VertexBufferData(R8object vbo, const R8void* vertices, const R8void* texCoords, const R8void* color, R8sizei stride, R8sizei numVerts);
 
 /// Binds the vertex buffer data to use the associated vertex data to render
-R8void r8BindVertexBuffer(R8Object vbo);
+R8void r8BindVertexBuffer(R8object vbo);
 
 /****************************************************
  *                                                  *
@@ -103,17 +103,17 @@ R8void r8BindVertexBuffer(R8Object vbo);
  ****************************************************/
 
 /// Creates a index buffer to hold the index data to draw the vertices in a indexed manner
-R8Object r8CreateIndexBuffer();
+R8object r8CreateIndexBuffer();
 
 /// Delete the specified index buffer 
-R8void r8DeleteIndexBuffer(R8Object ibo);
+R8void r8DeleteIndexBuffer(R8object ibo);
 
 /// Add data to the index buffer
 // TODO: Use vector types instead of (void*)
-R8void r8IndexBufferData(R8Object ibo, const R8void* indices, R8sizei indicesCount);
+R8void r8IndexBufferData(R8object ibo, const R8void* indices, R8sizei indicesCount);
 
 /// Binds the index buffer object to use the associated indices to render the vertices
-R8void r8BindIndexBuffer(R8Object ibo);
+R8void r8BindIndexBuffer(R8object ibo);
 
 /****************************************************
  *                                                  *
@@ -122,19 +122,19 @@ R8void r8BindIndexBuffer(R8Object ibo);
  ****************************************************/
 
 /// Create an object to hold the texture data
-R8Object r8GenerateTexture();
+R8object r8GenerateTexture();
 
 /// Delete the texture
-R8void r8DeleteTexture(R8Object texture);
+R8void r8DeleteTexture(R8object texture);
 
 /// Bind the texture to the buffer to render onto the screen
-R8void r8BindTexture(R8Object texture);
+R8void r8BindTexture(R8object texture);
 
 /// Add data to the texture 
-R8void r8TextureImage2D(R8Object texture, R8int widthm, R8int, height, R8enum format, const R8void* data);
+R8void r8TextureImage2D(R8object texture, R8int widthm, R8int, height, R8enum format, const R8void* data);
 
 /// Whether to or not generate mip maps for the given texture
-R8void r8GenerateMipMaps(R8Object texture);
+R8void r8GenerateMipMaps(R8object texture);
 
 /// Sets the texture environment parameters
 R8void r8TexEnvi(R8enum param, R8int value);

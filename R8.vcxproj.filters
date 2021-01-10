@@ -96,6 +96,9 @@
     <ClInclude Include="source\rasterizer\r8_state_machine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_renderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="include\r8_constants.h">
@@ -141,6 +144,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_image.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\rasterizer\r8_state_machine.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\rasterizer\r8_renderer.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

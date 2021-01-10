@@ -7,11 +7,9 @@
 #ifndef R_8_VERTEX_BUFFER_H
 #define R_8_VERTEX_BUFFER_H
 
-#include "r8_structs.h"
-#include "r8_types.h"
 #include "r8_vertex.h"
 #include "r8_viewport.h"
-#include "r8_vertex.h"
+#include "r8_matrix4.h"
 
 #include <stdio.h>
 

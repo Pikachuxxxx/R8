@@ -7,6 +7,8 @@
 #ifndef R_8_MEMORY_H
 #define R_8_MEMORY_H
 
+#include <stdlib.h>
+
 #define R8_MALLOC(T)    (T*)malloc(sizeof(T))
 #define R8_CALLOC(T, n) (T*)calloc(n, sizeof(T))
 

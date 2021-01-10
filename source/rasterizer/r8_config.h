@@ -21,7 +21,7 @@
 #endif
 
 /// Merge color- and depth buffers to a single one inside a frame buffer.
-#define R8_MERGE_COLOR_AND_DEPTH_BUFFERS //!CAN NOT BE DISABLED YET!
+#define R8_MERGE_COLOR_AND_DEPTH_BUFFERS // cannot be disabled yet!!!
 
 /// Makes all pixels with color black a transparent pixel.
 #define R8_BLACK_TO_TRANSPARENCY
@@ -40,6 +40,6 @@
 
 /// 32-bit interpolation type.
 typedef float R8interp;
-#define R8_FLOAT(x) x##f
+#define R8_FLOAT(x) x##f // appending the f to the number
 
 #endif 

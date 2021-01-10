@@ -5,8 +5,10 @@
  */
 
 #include "r8_image.h"
-
-
+#include "r8_error.h"
+#include "r8_memory.h"
+#include "r8_config.h"
+#include "r8_color_palette.h"
 
 R8Image* r8ImageLoadFromFile(const char* fileName)
 {
@@ -37,7 +39,7 @@ R8Image* r8ImageLoadFromFile(const char* fileName)
     return image;
 }
 
-R8Image* r8ImageGenerate(R8int width, R8int height)
+R8Image* r8ImageGenerate(R8int width, R8int height, R8int format)
 {
     if (width <= 0 || height <= 0 || format < 1 || format > 4)
     {
@@ -162,7 +164,7 @@ R8void r8ImageColorToColorBuffer(R8ColorBuffer* dstColors, const R8Image* srcIma
         // Apply dithering to buffer
         for (R8int y = 0; y < height; ++y)
         {
-            for (PRint x = 0; x < width; ++x)
+            for (R8int x = 0; x < width; ++x)
             {
                 r8DitherColor(buffer, x, y, 0, width, height, 36);
                 r8DitherColor(buffer, x, y, 1, width, height, 36);
@@ -177,7 +179,7 @@ R8void r8ImageColorToColorBuffer(R8ColorBuffer* dstColors, const R8Image* srcIma
             color.r = buffer[j];
             color.g = buffer[j + 1];
             color.b = buffer[j + 2];
-            dstColors[i] = r8RGBToColorBuffer(color);
+            dstColors[i] = r8RGBToColorBuffer(buffer[j], buffer[j + 1], buffer[j + 2]);
         }
 
         // Delete temporary buffer
@@ -198,7 +200,7 @@ R8void r8ImageColorToColorBuffer(R8ColorBuffer* dstColors, const R8Image* srcIma
                 color.r = gray;
                 color.g = gray;
                 color.b = gray;
-                dstColors[i] = r8RGBToColorBuffer(color);
+                dstColors[i] = r8RGBToColorBuffer(gray, gray, gray);
             }
         }
         else
@@ -210,7 +212,7 @@ R8void r8ImageColorToColorBuffer(R8ColorBuffer* dstColors, const R8Image* srcIma
                 color.r = src[j];
                 color.g = src[j + 1];
                 color.b = src[j + 2];
-                dstColors[i] = r8RGBToColorBuffer(color);
+                dstColors[i] = r8RGBToColorBuffer(src[j], src[j + 1], src[j + 2]);
             }
         }
     }

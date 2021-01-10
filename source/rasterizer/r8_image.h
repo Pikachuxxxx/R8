@@ -9,7 +9,6 @@
 
 #include "r8_types.h"
 #include "r8_color.h"
-#include "r8_image.h"
 
 typedef struct R8Image 
 {
@@ -23,9 +22,9 @@ typedef struct R8Image
 
 R8Image* r8ImageLoadFromFile(const char* fileName);
 
-R8Image* r8ImageGenerate(R8int width, R8int height);
+R8Image* r8ImageGenerate(R8int width, R8int height, R8int format);
 R8void r8ImageDelete(R8Image* image);
 
-R8void r8ImageColorToColorBuffer(R8ColorBuffer* volorbuffer, const R8Image* srvImage, R8bool dither);
+R8void r8ImageColorToColorBuffer(R8ColorBuffer* dstColors, const R8Image* srcImage, R8bool dither);
 
 #endif

@@ -7,8 +7,7 @@
 #ifndef R_8_GLOBAL_STATE_H
 #define R_8_GLOBAL_STATE_H
 
-#include "r8_config.h"
-#include "r8_error.h"
+#include "r8_texture.h"
 #include "r8_vertexbuffer.h"
 
 #define R8_SINGLULAR_TEXTURE        globalState.singularTexture
@@ -20,7 +19,7 @@
 typedef struct R8GlobalState
 {
     R8Texture singularTexture;
-
+    R8VertexBuffer singularVertexBuffer;
     // Immediate mode
     R8VertexBuffer  immModeVertexBuffer;
     R8bool          immModeActive;
@@ -34,7 +33,7 @@ extern R8GlobalState globalState;
 R8void r8GlobalStateInit();
 R8void r8GlobalStateRelease();
 
-R8void r8ImmediateModeBegin();
+R8void r8ImmediateModeBegin(R8enum primitives);
 R8void r8ImmediateModeRelease();
 
 R8void r8ImmediateModeTexCoord(R8float u, R8float v);

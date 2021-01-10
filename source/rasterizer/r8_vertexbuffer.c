@@ -5,12 +5,19 @@
  */
 
 #include "r8_vertexbuffer.h"
+#include "r8_state_machine.h"
+#include "r8_error.h"
+#include "r8_config.h"
+#include "r8_memory.h"
 
 R8VertexBuffer* r8VertexBufferGenerate()
 {
     R8VertexBuffer* buffer = R8_MALLOC(R8VertexBuffer);
     buffer->numVerts = 0;
     buffer->vertices = NULL;
+
+    r8AddSMRef(buffer);
+
     return buffer;
 }
 
@@ -18,6 +25,8 @@ R8void r8VertexBufferDelete(R8VertexBuffer* buffer)
 {
     if (buffer != NULL)
     {
+        r8ReleaseSMRef(buffer);
+
         R8_FREE(buffer->vertices);
         R8_FREE(buffer);
     }
@@ -34,7 +43,7 @@ R8void r8VertexBufferInit(R8VertexBuffer* buffer, R8sizei numVerts)
 
 R8void r8VertexBufferClear(R8VertexBuffer* buffer)
 {
-    if (buffer != null)
+    if (buffer != NULL)
         R8_FREE(buffer->vertices);
 }
 
@@ -77,7 +86,6 @@ R8void r8VertexBufferTransformVertices(R8sizei numVerts, R8sizei firstVertex, R8
 
 R8void r8VertexBufferTransformAllVertices(R8VertexBuffer* vertexbuffer, const R8Mat4* MVPMatrix, const R8Viewport* viewport)
 {
-
     for (R8sizei i = 0; i < vertexbuffer->numVerts; ++i)
     {
         r8TransformVertex((vertexbuffer->vertices + i), MVPMatrix, viewport);

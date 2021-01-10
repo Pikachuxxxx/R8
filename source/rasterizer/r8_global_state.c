@@ -5,6 +5,8 @@
  */
 
 #include "r8_global_state.h"
+#include "r8_config.h"
+#include "r8_error.h"
 
 R8void r8GlobalStateInit()
 {
@@ -16,7 +18,7 @@ R8void r8GlobalStateRelease()
 
 }
 
-R8void r8ImmediateModeBegin()
+R8void r8ImmediateModeBegin(R8enum primitives)
 {
 
 }

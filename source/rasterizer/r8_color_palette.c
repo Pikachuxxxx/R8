@@ -37,7 +37,7 @@ R8void r8FillColorPalette(R8ColorPalette* palette)
 }
 
 // WTF is happening here?
-R8ColorBuffer r8RGBToColorBuffer(R8Color color)
+R8ColorBuffer r8RGBToColorBuffer(R8ubyte r, R8ubyte g, R8ubyte b)
 {
-    return ((color.r / 32) << 5) | ((color.g / 32) << 2) | (color.b / 64);
+    return ((r / 32) << 5) | ((g / 32) << 2) | (b / 64);
 }

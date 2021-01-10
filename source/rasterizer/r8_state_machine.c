@@ -5,20 +5,25 @@
  */
 
 #include "r8_state_machine.h"
+#include "r8_config.h"
+#include "r8_error.h"
+#include "r8_external_math.h"
+#include "r8_color_palette.h"
 
 static R8StateMachine nullStateMachine_;
-R8StateMachine* stateMachine_ = &nullStateMachine_;
+
+R8StateMachine* stateMachine_ = &(nullStateMachine_);
 
 static R8void r8StateMachineClipRect(R8int left, R8int top, R8int right, R8int bottom)
 {
-    stateMachine_->clipRect.left    = left;
-    stateMachine_->clipRect.right   = right;
+    stateMachine_->clipQuad.left    = left;
+    stateMachine_->clipQuad.right   = right;
 
     #ifdef R8_ORIGIN_TOP_LEFT
 
     if (R8_STATE_MACHINE.framebuffer != NULL)
     {
-        PRint height = (PRint)(R8_STATE_MACHINE.framebuffer->height);
+        R8int height = (R8int)(R8_STATE_MACHINE.framebuffer->height);
         stateMachine_->clipQuad.top     = height - bottom - 1;
         stateMachine_->clipQuad.bottom  = height - top - 1;
     }
@@ -39,23 +44,23 @@ static R8void r8StateMachineClipRect(R8int left, R8int top, R8int right, R8int b
 static void r8UpdateClipRect()
 {
     // Get dimensions from viewport
-    PRint left      = R8_STATE_MACHINE.viewportQuad.left;
-    PRint top       = R8_STATE_MACHINE.viewportQuad.top;
-    PRint right     = R8_STATE_MACHINE.viewportQuad.right;
-    PRint bottom    = R8_STATE_MACHINE.viewportQuad.bottom;
+    R8int left      = R8_STATE_MACHINE.viewportQuad.left;
+    R8int top       = R8_STATE_MACHINE.viewportQuad.top;
+    R8int right     = R8_STATE_MACHINE.viewportQuad.right;
+    R8int bottom    = R8_STATE_MACHINE.viewportQuad.bottom;
 
-    if (PR_STATE_MACHINE.states[PR_SCISSOR] != PR_FALSE)
+    if (R8_STATE_MACHINE.states[R8_SCISSOR_MODE] != R8_FALSE)
     {
         // Get dimensions from scissor
-        PR_CLAMP_LARGEST(left,      R8_STATE_MACHINE.scissorQuad.left);
-        PR_CLAMP_LARGEST(top,       R8_STATE_MACHINE.scissorQuad.top);
-        PR_CLAMP_SMALLEST(right,    R8_STATE_MACHINE.scissorQuad.right);
-        PR_CLAMP_SMALLEST(bottom,   R8_STATE_MACHINE.scissorQuad.bottom);
+        R8_CLAMP_LARGEST(left,      R8_STATE_MACHINE.scissorQuad.left);
+        R8_CLAMP_LARGEST(top,       R8_STATE_MACHINE.scissorQuad.top);
+        R8_CLAMP_SMALLEST(right,    R8_STATE_MACHINE.scissorQuad.right);
+        R8_CLAMP_SMALLEST(bottom,   R8_STATE_MACHINE.scissorQuad.bottom);
     }
 
     // Clamp clipping rectangle
-    const PRint maxWidth = R8_STATE_MACHINE.framebuffer->width - 1;
-    const PRint maxHeight = R8_STATE_MACHINE.framebuffer->height - 1;
+    const R8int maxWidth = R8_STATE_MACHINE.framebuffer->width - 1;
+    const R8int maxHeight = R8_STATE_MACHINE.framebuffer->height - 1;
 
     r8StateMachineClipRect(
         R8_CLAMP(left, 0, maxWidth),
@@ -65,15 +70,15 @@ static void r8UpdateClipRect()
     );
 }
 
-R8void r8AddSMRef(R8object* ref);
+R8void r8AddSMRef(R8object object)
 {
-    if (ref != NULL)
+    if (object != NULL)
         ++stateMachine_->refCounter;
 }
 
-R8void r8ReleaseSMRef(R8object* ref)
+R8void r8ReleaseSMRef(R8object object)
 {
-    if(ref != NULL)
+    if(object != NULL)
     {
         if(stateMachine_->refCounter == NULL)
             R8_ERROR(R8_ERROR_NULL_POINTER);
@@ -84,11 +89,10 @@ R8void r8ReleaseSMRef(R8object* ref)
 
 R8void r8AssertSMRef(R8StateMachine* stateMachine)
 {
-    if(stateMachine != NULL && stateMachine.refCounter != 0)
+    if(stateMachine != NULL && stateMachine->refCounter != 0)
     {
-        char msg[64];
-        sprintf(msg, "object ref-counter is none zero ( %i )", stateMachine->refCounter);
-        // TODO: Report the error here
+        printf("object ref-counter is none zero ( %i )", stateMachine->refCounter);
+        R8_ERROR(R8_ERROR_INVALID_STATE);
     }
 }
 
@@ -114,12 +118,12 @@ R8void r8InitStateMachine(R8StateMachine* stateMachine)
     // TODO: convert the arguments to single color argument
     stateMachine->clearColor                = r8RGBToColorBuffer(0, 0, 0);
     stateMachine->color0                    = r8RGBToColorBuffer(0, 0, 0);
-    stateMachine->textureLodBias            = 0;
-    stateMachine->cullMode                  = R8_CULL_MODE;
+    stateMachine->textureLODBias = 0;
+    stateMachine->cullMode                  = R8_CULL_NONE;
     stateMachine->polygonMode               = R8_POLYGON_FILL;
 
-    stateMachine->states[R8_SCISSOR]        = R8_FALSE;
-    stateMachine->states[R8_MIP_MAPPING]    = R8_FALSE;
+    stateMachine->states[R8_SCISSOR_MODE]    = R8_FALSE;
+    stateMachine->states[R8_MIPMAP_MODE]    = R8_FALSE;
 
     stateMachine->refCounter                = 0;
 }
@@ -137,7 +141,7 @@ R8void r8StateMachineMakeCurrent(R8StateMachine* stateMachine)
         stateMachine_ = &nullStateMachine_;
 }
 
-R8void r8StateMachineSetState(R8enum cap, PRboolean state)
+R8void r8StateMachineSetState(R8enum cap, R8bool state)
 {
     if (cap >= R8_NUM_STATES)
     {
@@ -151,7 +155,7 @@ R8void r8StateMachineSetState(R8enum cap, PRboolean state)
     // Check for special cases (update functions)
     switch (cap)
     {
-        case R8_SCISSOR:
+        case R8_SCISSOR_MODE:
             r8UpdateClipRect();
             break;
     }
@@ -172,7 +176,7 @@ R8void r8StateMachineSetTexenvi(R8enum param, R8int value)
     switch (param)
     {
         case R8_TEXTURE_LOD_BIAS:
-            R8_STATE_MACHINE.textureLodBias = (PRubyte)R8_CLAMP(value, 0, 255);
+            R8_STATE_MACHINE.textureLODBias = (R8ubyte)R8_CLAMP(value, 0, 255);
             break;
         default:
             R8_ERROR(R8_ERROR_INDEX_OUT_OF_BOUNDS);
@@ -185,7 +189,7 @@ R8int r8StateMachineGetTexenvi(R8enum param)
     switch (param)
     {
         case R8_TEXTURE_LOD_BIAS:
-            return (R8int)R8_STATE_MACHINE.textureLodBias;
+            return (R8int)R8_STATE_MACHINE.textureLODBias;
         default:
             R8_ERROR(R8_ERROR_INDEX_OUT_OF_BOUNDS);
             return 0;
@@ -218,19 +222,19 @@ R8void r8StateMachineBindexture(R8Texture* texture)
 
 R8void r8StateMachineViewport(R8int x, R8int y, R8int width, R8int height)
 {
-    if (R8_STATE_MACHINE.boundFrameBuffer == NULL)
+    if (R8_STATE_MACHINE.framebuffer == NULL)
     {
-        PR_ERROR(PR_ERROR_INVALID_STATE);
+        R8_ERROR(R8_ERROR_INVALID_STATE);
         return;
     }
 
     /*
     Store width and height with half size, to avoid this multiplication
-    while transforming the normalized device coordinates (NDC) into viewspace.
+    while transforming the normalized device coordinates (NDC) into view space.
     */
     R8_STATE_MACHINE.viewport.x = (R8float)x;
 
-    #ifdef PR_ORIGIN_LEFT_TOP
+    #ifdef R8_ORIGIN_TOP_LEFT
     R8_STATE_MACHINE.viewport.y = (R8float)(R8_STATE_MACHINE.framebuffer->height - 1 - y);
     #else
     R8_STATE_MACHINE.viewport.y = (R8float)y;
@@ -259,15 +263,15 @@ R8void r8StateMachineDepthRange(R8float minDepth, R8float maxDepth)
 R8void r8StateMachineScissor(R8int x, R8int y, R8int width, R8int height)
 {
     // Store scissor rectangle
-    R8_STATE_MACHINE.scissorQuad.left   = x;
-    R8_STATE_MACHINE.scissorQuad.top    = y;
-    R8_STATE_MACHINE.scissorQuad.right  = x + width;
+    R8_STATE_MACHINE.scissorQuad.left = x;
+    R8_STATE_MACHINE.scissorQuad.top = y;
+    R8_STATE_MACHINE.scissorQuad.right = x + width;
     R8_STATE_MACHINE.scissorQuad.bottom = y + height;
 
-    if (R8_STATE_MACHINE.states[R8_SCISSOR] != R8_FALSE)
+    if (R8_STATE_MACHINE.states[R8_SCISSOR_MODE] != R8_FALSE)
     {
         // Update clipping rectangle
-        r8UpdateClipRect
+        r8UpdateClipRect();
     }
 }
 
@@ -299,30 +303,32 @@ static void _update_viewprojection_matrix()
 static void _update_worldview_matrix()
 {
     r8Mat4MultiplyMatrix(
-        &(R8_STATE_MACHINE.worldViewMatrix),
+        &(R8_STATE_MACHINE.modelViewMatrix),
         &(R8_STATE_MACHINE.viewMatrix),
-        &(R8_STATE_MACHINE.worldMatrix)
+        &(R8_STATE_MACHINE.modelMatrix)
     );
 }
 
 static void _update_worldviewprojection_matrix()
 {
     r8Mat4MultiplyMatrix(
-        &(R8_STATE_MACHINE.worldViewProjectionMatrix),
+        &(R8_STATE_MACHINE.MVPMatrix),
         &(R8_STATE_MACHINE.viewProjectionMatrix),
-        &(R8_STATE_MACHINE.worldMatrix)
+        &(R8_STATE_MACHINE.modelMatrix)
     );
 }
 
 R8void r8StateMachineProjectionMatrix(const R8Mat4* matrix)
 {
     r8Mat4Copy(&(R8_STATE_MACHINE.projectionMatrix), matrix);
+
     _update_viewprojection_matrix();
     _update_worldviewprojection_matrix();
 }
 R8void r8StateMachineViewMatrix(const R8Mat4* matrix)
 {
     r8Mat4Copy(&(R8_STATE_MACHINE.viewMatrix), matrix);
+
     _update_viewprojection_matrix();
     _update_worldview_matrix();
     _update_worldviewprojection_matrix();
@@ -331,6 +337,7 @@ R8void r8StateMachineViewMatrix(const R8Mat4* matrix)
 R8void r8StateMachineModelMatrix(const R8Mat4* matrix)
 {
     r8Mat4Copy(&(R8_STATE_MACHINE.modelMatrix), matrix);
+
     _update_worldview_matrix();
     _update_worldviewprojection_matrix();
 }
