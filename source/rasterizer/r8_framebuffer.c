@@ -88,41 +88,41 @@ R8void r8FrameBufferClear(R8FrameBuffer* framebuffer, R8float clearDepth, R8bit 
         R8_ERROR(R8_ERROR_NULL_POINTER);
 }
 
-R8void r8FrameBufferSetupScanlines(R8FrameBuffer* framebuffer, R8SideScanline* sides, R8RasterVertex* start, R8RasterVertex* end)
+R8void r8FrameBufferSetupScanlines(R8FrameBuffer* framebuffer, R8SideScanline* sides, R8RasterVertex start, R8RasterVertex end)
 {
     R8int pitch = (R8int)framebuffer->width;
-    R8int len = end->y - start->y;
+    R8int len = end.y - start.y;
 
     if (len <= 0)
     {
-        sides[start->y].pixelOffset = start->y * pitch + start->x;
+        sides[start.y].pixelOffset = start.y * pitch + start.x;
         return;
     }
 
     // Compute offsets (need doubles for offset for better precision, because the range is larger)
-    R8double offsetStart = (R8double)(start->y * pitch + start->x);
-    R8double offsetEnd = (R8double)(end->y * pitch + end->x);
+    R8double offsetStart = (R8double)(start.y * pitch + start.x);
+    R8double offsetEnd = (R8double)(end.y * pitch + end.x);
     R8double offsetStep = (offsetEnd - offsetStart) / len;
 
-    R8interp zStep = (end->z - start->z) / len;
-    R8interp uStep = (end->u - start->u) / len;
-    R8interp vStep = (end->v - start->v) / len;
+    R8interp zStep = (end.z - start.z) / len;
+    R8interp uStep = (end.u - start.u) / len;
+    R8interp vStep = (end.v - start.v) / len;
 
     // Fill scan line sides
-    R8SideScanline* sidesEnd = &(sides[end->y]);
+    R8SideScanline* sidesEnd = &(sides[end.y]);
 
-    for (sides += start->y; sides <= sidesEnd; ++sides)
+    for (sides += start.y; sides <= sidesEnd; ++sides)
     {
         // Setup scan line side
         sides->pixelOffset = (R8int)(offsetStart + 0.5);
-        sides->z = start->z;
-        sides->u = start->u;
-        sides->v = start->v;
+        sides->z = start.z;
+        sides->u = start.u;
+        sides->v = start.v;
 
         // Next step
         offsetStart += offsetStep;
-        start->z += zStep;
-        start->u += uStep;
-        start->v += vStep;
+        start.z += zStep;
+        start.u += uStep;
+        start.v += vStep;
     }
 }

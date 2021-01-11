@@ -40,7 +40,7 @@ R8void r8TextureInit(R8Texture* texture);
 R8void r8TextureClear(R8Texture* texture);
 
 /// Sets the single color to the specified texture
-inline R8void r8TextureColor(R8Texture* texture, R8ColorBuffer colorbuffer)
+inline R8void r8TextureSingleColor(R8Texture* texture, R8ColorBuffer colorbuffer)
 {
     texture->texels[0] = colorbuffer;
 }

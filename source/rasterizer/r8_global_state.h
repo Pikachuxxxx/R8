@@ -10,8 +10,8 @@
 #include "r8_texture.h"
 #include "r8_vertexbuffer.h"
 
-#define R8_SINGLULAR_TEXTURE        globalState.singularTexture
-#define R8_SINGULAR_VERTEX_BUFFER   globalState.singularVertexBuffer
+#define R8_SINGLULAR_TEXTURE        globalState_.singularTexture
+#define R8_SINGULAR_VERTEX_BUFFER   globalState_.singularVertexBuffer
 
 // Number of vertices for the vertex buffer of the immediate drawing mode
 #define R8_NUM_IMMEDIATE_VERTICES   32
@@ -28,13 +28,13 @@ typedef struct R8GlobalState
 }R8GlobalState;
 
 /// Global render engine state
-extern R8GlobalState globalState;
+extern R8GlobalState globalState_;
 
 R8void r8GlobalStateInit();
 R8void r8GlobalStateRelease();
 
 R8void r8ImmediateModeBegin(R8enum primitives);
-R8void r8ImmediateModeRelease();
+R8void r8ImmediateModeEnd();
 
 R8void r8ImmediateModeTexCoord(R8float u, R8float v);
 R8void r8ImmediateModeVertex(R8float x, R8float y, R8float z, R8float w);

@@ -21,9 +21,6 @@
     <ClInclude Include="include\r8_errors.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\r8_types.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\r8_structs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -99,6 +96,12 @@
     <ClInclude Include="source\rasterizer\r8_renderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\r8_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\platform\win32\context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="include\r8_constants.h">
@@ -150,6 +153,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_renderer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\platform\win32\context.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

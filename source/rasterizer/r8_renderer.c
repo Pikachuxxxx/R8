@@ -70,7 +70,7 @@ static R8void setup_raster_vertex(R8RasterVertex* rasterVert, const R8ClipVertex
     rasterVert->v = clipVert->v;
 }
 
-/// Returns true if the specified triangle vertices are culled
+// Returns true if the specified triangle vertices are culled
 static R8bool is_triangle_culled(const R8Vec2 a, const R8Vec2 b, const R8Vec2 c)
 {
     if (R8_STATE_MACHINE.cullMode != R8_CULL_NONE)
@@ -449,9 +449,9 @@ static R8void render_screenspace_image_textured(const R8Texture* texture, R8int 
     #endif
 
     if (top > bottom)
-        R8_SWAP(PRint, top, bottom);
+        R8_SWAP(R8int, top, bottom);
     if (left > right)
-        R8_SWAP(PRint, left, right);
+        R8_SWAP(R8int, left, right);
 
     // Select MIP level
     R8texturesize width = 0, height = 0;
@@ -483,21 +483,16 @@ static R8void render_screenspace_image_textured(const R8Texture* texture, R8int 
         {
             R8ColorBuffer color = r8TextureSampleFromNearestMipmap(texels, width, height, u, v);
 
-            #ifdef R8_BLACK_TO_TRANSPARENCY
-            #   ifdef PR_COLOR_BUFFER_24BIT
-            if (color.r != 0 || color.g != 0 || color.b != 0)
-            {
-            #   else
+        #ifdef R8_BLACK_TO_TRANSPARENCY
             if (color != 0)
             {
-            #   endif
-            #endif
+        #endif
 
-                scanline->colorIndex = color;
+                scanline->colorBuffer = color;
 
-            #ifdef R8_BLACK_TO_TRANSPARENCY
+        #ifdef R8_BLACK_TO_TRANSPARENCY
             }
-            #endif
+        #endif
 
             ++scanline;
             u += uStep;
@@ -511,7 +506,7 @@ static R8void render_screenspace_image_textured(const R8Texture* texture, R8int 
     }
 }
 
-static R8void render_screenspace_image_colored(R8ColorBuffer colorIndex, R8int left, R8int top, R8int right, R8int bottom)
+static R8void render_screenspace_image_colored(R8ColorBuffer colorBuffer, R8int left, R8int top, R8int right, R8int bottom)
 {
     R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
 
@@ -528,9 +523,9 @@ static R8void render_screenspace_image_colored(R8ColorBuffer colorIndex, R8int l
     #endif
 
     if (top > bottom)
-        R8_SWAP(PRint, top, bottom);
+        R8_SWAP(R8int, top, bottom);
     if (left > right)
-        R8_SWAP(PRint, left, right);
+        R8_SWAP(R8int, left, right);
 
     // Rasterize rectangle
     R8Pixel* pixels = frameBuffer->pixels;
@@ -542,7 +537,7 @@ static R8void render_screenspace_image_colored(R8ColorBuffer colorIndex, R8int l
         scanline = pixels + (y * pitch + left);
         for (R8int x = left; x <= right; ++x)
         {
-            scanline->colorIndex = colorIndex;
+            scanline->colorBuffer = colorBuffer;
             ++scanline;
         }
     }
@@ -563,9 +558,9 @@ R8void r8RenderScreenSpaceImage(R8int left, R8int top, R8int right, R8int bottom
 
 /********** Triangles **********/
 
-// Calculate the vertex 'c' which is cliped between the vertices 'a' and 'b' and the plane 'z'
+// Calculate the vertex 'c' which is clipped between the vertices 'a' and 'b' and the plane 'z'
 
-static R8ClipVertex get_z_plane_vertex(R8ClipVertex a, R8ClipVertex b, R8loat z)
+static R8ClipVertex get_z_plane_vertex(R8ClipVertex a, R8ClipVertex b, R8float z)
 {
     R8interp m = ((R8interp)(z - b.z)) / (a.z - b.z);
     R8ClipVertex c;
@@ -589,7 +584,7 @@ static R8void polygon_z_clipping(R8float zMin, R8float zMax)
     // Clip at near clipping plane (zMin)
     R8int localNumVerts = 0;
 
-    for (x = _numPolyVerts - 1, y = 0; y < _numPolyVerts; x = y, ++y)
+    for (x = numPolyVertices_ - 1, y = 0; y < numPolyVertices_; x = y, ++y)
     {
         // Inside
         if (clipVertices_[x].z >= zMin && clipVertices_[y].z >= zMin)
@@ -614,29 +609,29 @@ static R8void polygon_z_clipping(R8float zMin, R8float zMax)
     {
         // Inside
         if (clipVerticesTemp_[x].z <= zMax && clipVerticesTemp_[y].z <= zMax)
-            clipVertices_[_numPolyVerts++] = clipVerticesTemp_[y];
+            clipVertices_[numPolyVertices_++] = clipVerticesTemp_[y];
 
         // Leaving
         if (clipVerticesTemp_[x].z <= zMax && clipVerticesTemp_[y].z > zMax)
-            clipVertices_[_numPolyVerts++] = get_z_plane_vertex(clipVerticesTemp_[x], clipVerticesTemp_[y], zMax);
+            clipVertices_[numPolyVertices_++] = get_z_plane_vertex(clipVerticesTemp_[x], clipVerticesTemp_[y], zMax);
 
         // Entering
         if (clipVerticesTemp_[x].z > zMax && clipVerticesTemp_[y].z <= zMax)
         {
-            clipVertices_[_numPolyVerts++] = get_z_plane_vertex(clipVerticesTemp_[x], clipVerticesTemp_[y], zMax);
-            clipVertices_[_numPolyVerts++] = clipVerticesTemp_[y];
+            clipVertices_[numPolyVertices_++] = get_z_plane_vertex(clipVerticesTemp_[x], clipVerticesTemp_[y], zMax);
+            clipVertices_[numPolyVertices_++] = clipVerticesTemp_[y];
         }
     }
 }
 
-// Computes the vertex 'c' which is cliped between the vertices 'a' and 'b' and the plane 'x'
+// Computes the vertex 'c' which is clipped between the vertices 'a' and 'b' and the plane 'x'
 static R8RasterVertex get_xplane_vertex(R8RasterVertex a, R8RasterVertex b, R8int x)
 {
-    R8inter m = ((PRinterp)(x - b.x)) / (a.x - b.x);
+    R8interp m = ((R8interp)(x - b.x)) / (a.x - b.x);
     R8RasterVertex c;
 
     c.x = x;
-    c.y = (PRint)(m * (a.y - b.y) + b.y);
+    c.y = (R8int)(m * (a.y - b.y) + b.y);
     c.z = m * (a.z - b.z) + b.z;
 
     c.u = m * (a.u - b.u) + b.u;
@@ -645,13 +640,13 @@ static R8RasterVertex get_xplane_vertex(R8RasterVertex a, R8RasterVertex b, R8in
     return c;
 }
 
-// Computes the vertex 'c' which is cliped between the vertices 'a' and 'b' and the plane 'y'
+// Computes the vertex 'c' which is clipped between the vertices 'a' and 'b' and the plane 'y'
 static R8RasterVertex get_yplane_vertex(R8RasterVertex a, R8RasterVertex b, R8int y)
 {
-    R8interp m = ((PRinterp)(y - b.y)) / (a.y - b.y);
+    R8interp m = ((R8interp)(y - b.y)) / (a.y - b.y);
     R8RasterVertex c;
 
-    c.x = (PRint)(m * (a.x - b.x) + b.x);
+    c.x = (R8int)(m * (a.x - b.x) + b.x);
     c.y = y;
     c.z = m * (a.z - b.z) + b.z;
 
@@ -661,10 +656,443 @@ static R8RasterVertex get_yplane_vertex(R8RasterVertex a, R8RasterVertex b, R8in
     return c;
 }
 
+// Clips the polygon at the x and y planes
+static R8void polygon_xy_clipping(R8int xMin, R8int xMax, R8int yMin, R8int yMax)
+{
+    R8int x, y;
+
+    // Clip at left clipping plane (xMin)
+    R8int localNumVerts = 0;
+
+    for (x = numPolyVertices_ - 1, y = 0; y < numPolyVertices_; x = y, ++y)
+    {
+        // Inside
+        if (rasterVertices_[x].x >= xMin && rasterVertices_[y].x >= xMin)
+            rasterVerticesTemp_[localNumVerts++] = rasterVertices_[y];
+
+        // Leaving
+        if (rasterVertices_[x].x >= xMin && rasterVertices_[y].x < xMin)
+            rasterVerticesTemp_[localNumVerts++] = get_xplane_vertex(rasterVertices_[x], rasterVertices_[y], xMin);
+
+        // Entering
+        if (rasterVertices_[x].x < xMin && rasterVertices_[y].x >= xMin)
+        {
+            rasterVerticesTemp_[localNumVerts++] = get_xplane_vertex(rasterVertices_[x], rasterVertices_[y], xMin);
+            rasterVerticesTemp_[localNumVerts++] = rasterVertices_[y];
+        }
+    }
+
+    // Clip at right clipping plane (xMax)
+    numPolyVertices_ = 0;
+
+    for (x = localNumVerts - 1, y = 0; y < localNumVerts; x = y, ++y)
+    {
+        // Inside
+        if (rasterVerticesTemp_[x].x <= xMax && rasterVerticesTemp_[y].x <= xMax)
+            rasterVertices_[numPolyVertices_++] = rasterVerticesTemp_[y];
+
+        // Leaving
+        if (rasterVerticesTemp_[x].x <= xMax && rasterVerticesTemp_[y].x > xMax)
+            rasterVertices_[numPolyVertices_++] = get_xplane_vertex(rasterVerticesTemp_[x], rasterVerticesTemp_[y], xMax);
+
+        // Entering
+        if (rasterVerticesTemp_[x].x > xMax && rasterVerticesTemp_[y].x <= xMax)
+        {
+            rasterVertices_[numPolyVertices_++] = get_xplane_vertex(rasterVerticesTemp_[x], rasterVerticesTemp_[y], xMax);
+            rasterVertices_[numPolyVertices_++] = rasterVerticesTemp_[y];
+        }
+    }
+
+    // Clip at top clipping plane (yMin)
+    localNumVerts = 0;
+
+    for (x = numPolyVertices_ - 1, y = 0; y < numPolyVertices_; x = y, ++y)
+    {
+        // Inside
+        if (rasterVertices_[x].y >= yMin && rasterVertices_[y].y >= yMin)
+            rasterVerticesTemp_[localNumVerts++] = rasterVertices_[y];
+
+        // Leaving
+        if (rasterVertices_[x].y >= yMin && rasterVertices_[y].y < yMin)
+            rasterVerticesTemp_[localNumVerts++] = get_yplane_vertex(rasterVertices_[x], rasterVertices_[y], yMin);
+
+        // Entering
+        if (rasterVertices_[x].y < yMin && rasterVertices_[y].y >= yMin)
+        {
+            rasterVerticesTemp_[localNumVerts++] = get_yplane_vertex(rasterVertices_[x], rasterVertices_[y], yMin);
+            rasterVerticesTemp_[localNumVerts++] = rasterVertices_[y];
+        }
+    }
+
+    // Clip at bottom clipping plane (yMax)
+    numPolyVertices_ = 0;
+
+    for (x = localNumVerts - 1, y = 0; y < localNumVerts; x = y, ++y)
+    {
+        // Inside
+        if (rasterVerticesTemp_[x].y <= yMax && rasterVerticesTemp_[y].y <= yMax)
+            rasterVertices_[numPolyVertices_++] = rasterVerticesTemp_[y];
+
+        // Leaving
+        if (rasterVerticesTemp_[x].y <= yMax && rasterVerticesTemp_[y].y > yMax)
+            rasterVertices_[numPolyVertices_++] = get_yplane_vertex(rasterVerticesTemp_[x], rasterVerticesTemp_[y], yMax);
+
+        // Entering
+        if (rasterVerticesTemp_[x].y > yMax && rasterVerticesTemp_[y].y <= yMax)
+        {
+            rasterVertices_[numPolyVertices_++] = get_yplane_vertex(rasterVerticesTemp_[x], rasterVerticesTemp_[y], yMax);
+            rasterVertices_[numPolyVertices_++] = rasterVerticesTemp_[y];
+        }
+    }
+}
+
+static R8void index_inc(R8int* x, R8int numVertices)
+{
+    ++(*x);
+    if (*x >= numVertices)
+        *x = 0;
+}
+
+static R8void index_dec(R8int* x, R8int numVertices)
+{
+    --(*x);
+    if (*x < 0)
+        *x = numVertices - 1;
+}
+
+// Rasterizes convex polygon filled
+static R8void rasterize_polygon_fill(R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
+{
+    // Select MIP level
+    R8texturesize mipWidth = 0, mipHeight = 0;
+    const R8ColorBuffer* texels = r8TextureSelectMipmapLevel(texture, mipLevel, &mipWidth, &mipHeight);
+
+    // Find left- and right sided polygon edges
+    R8int x, y, top = 0, bottom = 0;
+
+    for (x = 1; x < numPolyVertices_; ++x)
+    {
+        if (rasterVertices_[top].y > rasterVertices_[x].y)
+            top = x;
+        if (rasterVertices_[bottom].y < rasterVertices_[x].y)
+            bottom = x;
+    }
+
+    // Setup raster scanline sides
+    R8SideScanline* leftSide = frameBuffer->scanlinesStart;
+    R8SideScanline* rightSide = frameBuffer->scanlinesEnd;
+
+    x = y = top;
+    for (index_dec(&y, numPolyVertices_); x != bottom; x = y, index_dec(&y, numPolyVertices_))
+        r8FrameBufferSetupScanlines(frameBuffer, leftSide, rasterVertices_[x], rasterVertices_[y]);
+
+    x = y = top;
+    for (index_inc(&y, numPolyVertices_); x != bottom; x = y, index_inc(&y, numPolyVertices_))
+        r8FrameBufferSetupScanlines(frameBuffer, rightSide, rasterVertices_[x], rasterVertices_[y]);
+
+    // Check if sides must be swapped
+    long midIndex = (rasterVertices_[bottom].y + rasterVertices_[top].y) / 2;
+    if (frameBuffer->scanlinesStart[midIndex].pixelOffset > frameBuffer->scanlinesEnd[midIndex].pixelOffset)
+        R8_SWAP(R8SideScanline*, leftSide, rightSide);
+
+    // Start rasterizing the polygon
+    R8int len, offset;
+    R8interp z, zAct, zStep;
+    R8interp u, uAct, uStep;
+    R8interp v, vAct, vStep;
+
+    R8int yStart = rasterVertices_[top].y;
+    R8int yEnd = rasterVertices_[bottom].y;
+
+    R8Pixel* pixel;
+
+    // Rasterize each scanline
+    for (y = yStart; y <= yEnd; ++y)
+    {
+        len = rightSide[y].pixelOffset - leftSide[y].pixelOffset;
+        if (len <= 0)
+            continue;
+
+        zStep = (rightSide[y].z - leftSide[y].z) / len;
+        uStep = (rightSide[y].u - leftSide[y].u) / len;
+        vStep = (rightSide[y].v - leftSide[y].v) / len;
+
+        offset = leftSide[y].pixelOffset;
+        zAct = leftSide[y].z;
+        uAct = leftSide[y].u;
+        vAct = leftSide[y].v;
+
+        // Rasterize current scanline
+        while (len-- >= 0)
+        {
+            // Fetch pixel from framebuffer
+            pixel = &(frameBuffer->pixels[offset]);
+
+            // Make depth test
+            R8DepthBuffer depth = r8WriteRealDepthToBuffer(zAct);
+
+            if (depth > pixel->depthBuffer)
+            {
+                pixel->depthBuffer = depth;
+
+                #ifdef R8_PERSPECTIVE_DEPTH_CORRECTED
+                // Compute perspective corrected texture coordinates
+                z = R8_FLOAT(1.0) / zAct;
+                u = uAct * z;
+                v = vAct * z;
+                #else
+                z = zAct;
+                u = uAct;
+                v = vAct;
+                #endif
+
+                // Sample texture
+                pixel->colorBuffer = r8TextureSampleFromNearestMipmap(texels, mipWidth, mipHeight, (R8float)u, (R8float)v);
+            }
+
+            // Next pixel
+            ++offset;
+            zAct += zStep;
+            uAct += uStep;
+            vAct += vStep;
+        }
+    }
+
+}
+
+// Rasterizes convex polygon outlines
+static R8void rasterize_polygon_line(R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
+{
+    for (R8int i = 0; i + 1 < numPolyVertices_; ++i)
+        rasterize_line(frameBuffer, texture, mipLevel, i, i + 1);
+
+    rasterize_line(frameBuffer, texture, mipLevel, numPolyVertices_ - 1, 0);
+}
+
+// Rasterizes convex polygon points
+static R8void rasterize_polygon_point(
+    R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
+{
+    for (R8int i = 0; i < numPolyVertices_; ++i)
+    {
+        r8FrameBufferPlot(
+            frameBuffer,
+            rasterVertices_[i].x,
+            rasterVertices_[i].y,
+            R8_STATE_MACHINE.color0
+        );
+    }
+}
+
+static R8void rasterize_polygon(R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
+{
+    // Rasterize polygon with selected MIP level
+    switch (R8_STATE_MACHINE.polygonMode)
+    {
+    case R8_POLYGON_FILL:
+        rasterize_polygon_fill(frameBuffer, texture, mipLevel);
+        break;
+    case R8_POLYGON_LINE:
+        rasterize_polygon_line(frameBuffer, texture, mipLevel);
+        break;
+    case R8_POLYGON_POINT:
+        rasterize_polygon_point(frameBuffer, texture, mipLevel);
+        break;
+    }
+}
+
+static R8bool clip_and_project_polygon(R8int numVertices)
+{
+    // Get clipping rectangle
+    const R8int xMin = R8_STATE_MACHINE.clipQuad.left;
+    const R8int xMax = R8_STATE_MACHINE.clipQuad.right;
+    const R8int yMin = R8_STATE_MACHINE.clipQuad.top;
+    const R8int yMax = R8_STATE_MACHINE.clipQuad.bottom;
+
+    // Z clipping
+    numPolyVertices_ = numVertices;
+    polygon_z_clipping(1.0f, 100.0f);//!!!
+    //_polygon_z_clipping(0.01f, 100.0f);//!!!
+
+    if (numPolyVertices_ < 3)
+        return R8_FALSE;
+
+    // Projection
+    for (R8int j = 0; j < numPolyVertices_; ++j)
+        project_vertex(&(clipVertices_[j]), &(R8_STATE_MACHINE.viewport));
+
+    // Make culling test
+    if (is_triangle_culled(R8_CLIP_VERT_VEC2(0), R8_CLIP_VERT_VEC2(1), R8_CLIP_VERT_VEC2(2)))
+        return R8_FALSE;
+
+    // Setup raster vertices
+    for (R8int j = 0; j < numPolyVertices_; ++j)
+        setup_raster_vertex(&(rasterVertices_[j]), &(clipVertices_[j]));
+
+    // Edge clipping
+    polygon_xy_clipping(xMin, xMax, yMin, yMax);
+
+    if (numPolyVertices_ < 3)
+        return R8_FALSE;
+
+    return R8_TRUE;
+}
+
+static R8ubyte compute_polygon_miplevel(const R8Texture* texture)
+{
+    if (R8_STATE_MACHINE.states[R8_MIPMAP_MODE] != R8_FALSE && texture->mips > 0)
+    {
+        // Find closest vertex
+        R8interp zMin = rasterVertices_[0].z;
+        for (R8int i = 1; i < numPolyVertices_; ++i)
+        {
+            if (zMin > rasterVertices_[i].z)
+                zMin = rasterVertices_[i].z;
+        }
+
+        // Derive mip level from z value
+        zMin = 0.25f / zMin;
+        R8int zLog = r8ApproxIntLog2((R8float)zMin);
+
+        return R8_CLAMP(zLog, 0, texture->mips - 1);
+    }
+    return 0;
+}
+
+static R8void render_triangles(
+    const R8Texture* texture, R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer)
+{
+    // Get clipping dimensions
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+
+    // Iterate over the index buffer
+    for (R8sizei i = firstVertex, n = numVertices + firstVertex; i + 2 < n; i += 3)
+    {
+        // Fetch vertices
+        const R8Vertex* vertexA = (vertexBuffer->vertices + i);
+        const R8Vertex* vertexB = (vertexBuffer->vertices + (i + 1));
+        const R8Vertex* vertexC = (vertexBuffer->vertices + (i + 2));
+
+        // Setup polygon
+        transform_vertex(&(clipVertices_[0]), vertexA);
+        transform_vertex(&(clipVertices_[1]), vertexB);
+        transform_vertex(&(clipVertices_[2]), vertexC);
+
+        if (clip_and_project_polygon(3) != R8_FALSE)
+        {
+            // Rasterize active polygon
+            rasterize_polygon(frameBuffer, texture, compute_polygon_miplevel(texture));
+        }
+    }
+}
+
+R8void r8RenderTriangles(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer)
+{
+
+    if (R8_STATE_MACHINE.framebuffer == NULL)
+    {
+        R8_ERROR(R8_ERROR_INVALID_STATE);
+        return;
+    }
+    if (vertexbuffer == NULL)
+    {
+        R8_ERROR(R8_ERROR_NULL_POINTER);
+        return;
+    }
+    if (firstVertex + numVertices > vertexbuffer->numVerts)
+    {
+        R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
+        return;
+    }
+
+    R8Texture* texture = R8_STATE_MACHINE.framebuffer;
+    if (texture == NULL || texture->texels == NULL)
+    {
+        r8TextureSingleColor(&R8_SINGLULAR_TEXTURE, R8_STATE_MACHINE.color0);
+        render_triangles(&R8_SINGLULAR_TEXTURE, numVertices, firstVertex, vertexbuffer);
+    }
+    else
+        render_triangles(texture, numVertices, firstVertex, vertexbuffer);
+}
 
 
+R8void r8RenderTrianglesStrip(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer)
+{
+    // TODO: To be implemented
+}
+
+static R8void render_indexed_triangles(
+    const R8Texture* texture, R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
+{
+    // Get clipping dimensions
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+
+    // Iterate over the index buffer
+    for (R8sizei i = firstVertex, n = numVertices + firstVertex; i + 2 < n; i += 3)
+    {
+        // Fetch indices
+        R8ushort indexA = indexBuffer->indices[i];
+        R8ushort indexB = indexBuffer->indices[i + 1];
+        R8ushort indexC = indexBuffer->indices[i + 2];
+
+        #ifdef R8_DEBUG
+        if (indexA >= vertexBuffer->numVerts || indexB >= vertexBuffer->numVerts || indexC >= vertexBuffer->numVerts)
+        {
+            R8_SET_FATAL_ERROR("element in index buffer out of bounds");
+            return;
+        }
+        #endif
+
+        // Fetch vertices
+        const R8Vertex* vertexA = (vertexBuffer->vertices + indexA);
+        const R8Vertex* vertexB = (vertexBuffer->vertices + indexB);
+        const R8Vertex* vertexC = (vertexBuffer->vertices + indexC);
+
+        // Setup polygon
+        transform_vertex(&(clipVertices_[0]), vertexA);
+        transform_vertex(&(clipVertices_[1]), vertexB);
+        transform_vertex(&(clipVertices_[2]), vertexC);
+
+        if (clip_and_project_polygon(3) != R8_FALSE)
+        {
+            // Rasterize active polygon
+            rasterize_polygon(frameBuffer, texture, compute_polygon_miplevel(texture));
+        }
+    }
+}
 
 
+R8void r8RenderIndexedTriangles(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer, const R8IndexBuffer* indexbuffer)
+{
 
+    if (R8_STATE_MACHINE.framebuffer == NULL)
+    {
+        R8_ERROR(R8_ERROR_INVALID_STATE);
+        return;
+    }
+    if (vertexbuffer == NULL || indexbuffer == NULL)
+    {
+        R8_ERROR(R8_ERROR_NULL_POINTER);
+        return;
+    }
+    if (firstVertex + numVertices > indexbuffer->numIndices)
+    {
+        R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
+        return;
+    }
+
+    if (R8_STATE_MACHINE.texture == NULL)
+    {
+        r8TextureSingleColor(&R8_SINGLULAR_TEXTURE, R8_STATE_MACHINE.color0);
+        render_indexed_triangles(&R8_SINGLULAR_TEXTURE, numVertices, firstVertex, vertexbuffer, indexbuffer);
+    }
+    else
+        render_indexed_triangles(R8_STATE_MACHINE.texture, numVertices, firstVertex, vertexbuffer, indexbuffer);
+}
+
+R8void r8RenderIndexedTrianglesStrip(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer, const R8IndexBuffer* indexbuffer)
+{
+    // TODO: To be Implemented
+}
 
 /******************************************************************************/

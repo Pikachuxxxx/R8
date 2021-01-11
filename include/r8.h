@@ -12,11 +12,11 @@ extern "C" {
 #endif //  _cplusplus
 
 #include "r8_constants.h"
-#include "r8_error_codes.h"
 #include "r8_macros.h"
 #include "r8_platform.h"
 #include "r8_structs.h"
 #include "r8_types.h"
+#include "r8_error.h"
 
 #include <stdio.h>
 
@@ -30,7 +30,7 @@ extern "C" {
 R8bool r8Ignite();
 
 /// Flush the Render Queue
-R8bool r8Flush();
+R8bool r8Release();
 
 /// Get the error code for the error
 R8enum r8GetError();
@@ -39,7 +39,7 @@ R8enum r8GetError();
 const char* r8GetString();
 
 /// Sets the error handler callback
-//R8void r8ErrorHandle(R8_ERROR_HANDLER_PROC errorHandler);
+R8void r8ErrorHandle(R8_ERROR_HANDLER_PROC errorHandler);
 
 /****************************************************
  *                                                  *
@@ -131,7 +131,7 @@ R8void r8DeleteTexture(R8object texture);
 R8void r8BindTexture(R8object texture);
 
 /// Add data to the texture 
-R8void r8TextureImage2D(R8object texture, R8int widthm, R8int, height, R8enum format, const R8void* data);
+R8void r8TexImage2D(R8object texture, R8int width, R8int height, R8enum format, const R8void* data, R8bool dither, R8bool generateMips);
 
 /// Whether to or not generate mip maps for the given texture
 R8void r8GenerateMipMaps(R8object texture);
@@ -155,19 +155,19 @@ R8void r8ViewMatrix(const R8float* matrix4x4);
 R8void r8ProjectionMatrix(const R8float* matrix4x4);
 
 /// Generate a 4x4 perspective matrix
-R8float* r8GeneratePerpspectiveMatrix(R8float fov, R8float aspectRatio, R8float nearPlane, R8float farPlane);
+R8void r8GeneratePerpspectiveMatrix(const R8float* matrix4x4,R8float fov, R8float aspectRatio, R8float nearPlane, R8float farPlane);
 
 /// Generate a 4x4 orthographic matrix
-R8float* r8GenerateOrthographicMatrix(R8float left, R8float right, R8float top, R8float bottom, R8float nearPlane, R8float farPlane);
+R8void r8GenerateOrthographicMatrix(const R8float* matrix4x4,R8float left, R8float right, R8float top, R8float bottom, R8float nearPlane, R8float farPlane);
 
 /// Generates a translation matrix
-R8float* r8Translate(R8float x, R8float y, R8float z);
+R8void r8Translate(const R8float* matrix4x4,R8float x, R8float y, R8float z);
 
 /// Generates a rotation matrix 
-R8float* r8Rotate(R8float x, R8float y, R8float z, R8float angle);
+R8void r8Rotate(const R8float* matrix4x4,R8float x, R8float y, R8float z, R8float angle);
 
 /// Generates a scaling matrix
-R8float* r8Scale(R8float x, R8float y, R8float z);
+R8void r8Scale(const R8float* matrix4x4,R8float x, R8float y, R8float z);
 
 /// Generates the identity of the specified 4x4 left-handed matrix
 R8void r8Identity(R8float* matrix4x4);
@@ -196,8 +196,8 @@ R8void r8PolygonDrawMode(R8enum mode);
 /// Sets the depth range of the depth buffer of the currently bound frame buffer
 R8void r8SetDepthRange(R8float min, R8float max);
 
-/// Set the point size while rendering points
-R8void r8PointSize(R8float size);
+/// Set the viewport position and dimensions
+R8void r8Viewport(R8int x, R8int y, R8int width, R8int height);
 
 /// Sets the scissoring rectangle dimensions
 R8void r8ScissorRect(R8int x, R8int y, R8int width, R8int height);
@@ -228,11 +228,8 @@ R8void r8DrawPoint(R8float x, R8float y);
 /// Draw a line 
 R8void r8DrawLine(R8float x1, R8float y1, R8float x2, R8float y2);
 
-/// Draw a quad 
-R8void r8DrawQuad(R8float x, R8float y, R8float width, R8float height);
-
 /// Draw a texture onto the screen
-R8void r8DrawTexture(R8float x, R8float y, R8float width, R8float height);
+R8void r8DrawTexture(R8int left, R8int top, R8int right, R8int bottom);
 
 /****************************************************
  *                                                  *
@@ -240,7 +237,7 @@ R8void r8DrawTexture(R8float x, R8float y, R8float width, R8float height);
  *                                                  *
  ****************************************************/
 /// Begin immediate drawing mode
-R8void r8Begin();
+R8void r8Begin(R8enum primitive);
 
 /// End immediate drawing mode
 R8void r8End();
@@ -255,7 +252,7 @@ R8void r8Vertex3f(R8float x, R8float y, R8float z);
 R8void r8Vertex4f(R8float x, R8float y, R8float z, R8float w);
 
 /// Sets the texture coordinates of the current vertex
-R8void r9TexCoord2f(R8float s, R8float t);
+R8void r8TexCoord2f(R8float s, R8float t);
 
 /// Sets the color of the current vertex
 R8void r8VertexColor4f(R8float r, R8float g, R8float b, R8float a);

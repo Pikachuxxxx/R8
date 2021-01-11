@@ -38,7 +38,7 @@ R8void r8FrameBufferDelete(R8FrameBuffer* framebuffer);
 
 R8void r8FrameBufferClear(R8FrameBuffer* framebuffer, R8float clearDepth, R8bit clearFlags);
 
-R8void r8FrameBufferSetupScanlines(R8FrameBuffer* framebuffer, R8SideScanline* sides, R8RasterVertex* start, R8RasterVertex* end);
+R8void r8FrameBufferSetupScanlines(R8FrameBuffer* framebuffer, R8SideScanline* sides, R8RasterVertex start, R8RasterVertex end);
 
 inline R8void r8FrameBufferPlot(R8FrameBuffer* framebuffer, R8uint x, R8uint y, R8ColorBuffer colorbuffer)
 {
