@@ -81,7 +81,7 @@ int main()
     );
 
     ShowWindow(wnd, SW_SHOW);
-    //UpdateWindow(wnd);
+    UpdateWindow(wnd);
     
     /**/
     if (!r8Ignite())
@@ -121,9 +121,6 @@ int main()
     
     while (GetMessage(&Msg, NULL, 0, 0) > 0 && !isQuit)
     {
-        TranslateMessage(&Msg);
-        DispatchMessage(&Msg);
-   
         // Update user input here
     
         // Setup world matrix
@@ -153,6 +150,9 @@ int main()
     
         // Show frame buffer on render context
         r8RenderPass(context);
+
+        TranslateMessage(&Msg);
+        DispatchMessage(&Msg);
     }
     
     // Release all objects

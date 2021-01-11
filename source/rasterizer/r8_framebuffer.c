@@ -52,7 +52,7 @@ R8void r8FrameBufferClear(R8FrameBuffer* framebuffer, R8float clearDepth, R8bit 
         R8DepthBuffer depth = r8WriteRealDepthToBuffer(clearDepth);
 
         // Get clear color from state machine (and optionally its color index)
-        //PRcolorindex clearColor = PR_STATE_MACHINE.clearColor;
+        R8ColorBuffer clearColor = R8_STATE_MACHINE.clearColor;
 
         // Iterate over the entire framebuffer
         R8Pixel* dst = framebuffer->pixels;
