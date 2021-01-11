@@ -15,9 +15,6 @@ typedef struct R8ContextDesc
      * For Linux, window type : 'const Window*'
      */
     const void* window;
-    const char* osName;
-    const char* kernel;
-    const int   osVer;
 }R8ContextDesc;
 
 #endif

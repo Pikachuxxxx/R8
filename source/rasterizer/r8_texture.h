@@ -9,14 +9,8 @@
 
 #include "r8_types.h"
 #include "r8_macros.h"
-#include "r8_config.h"
 #include "r8_color.h"
 #include "r8_structs.h"
-#include "r8_external_math.h"
-
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
 
 // Maximal 11 MIP-maps restricts the textures to have a
 // maximum size of (2^(11-1) = 1024) in width and height
@@ -40,13 +34,13 @@ typedef struct R8Texture
 }R8Texture;
 
 R8Texture* r8TextureGenerate();
-R8void r8TextureDelete();
+R8void r8TextureDelete(R8Texture* texture);
 
 R8void r8TextureInit(R8Texture* texture);
 R8void r8TextureClear(R8Texture* texture);
 
 /// Sets the single color to the specified texture
-inline R8void r8TextureColor(R8Texture* texture, R8ColorBuffer colorbuffer)
+inline R8void r8TextureSingleColor(R8Texture* texture, R8ColorBuffer colorbuffer)
 {
     texture->texels[0] = colorbuffer;
 }
@@ -58,7 +52,7 @@ R8bool r8TextureSubImage2d(R8Texture* texture, R8ubyte mipmap, R8texturesize x, 
 
 R8ubyte r8TextureNumMipMaps(R8ubyte maxSize);
 
-const R8ColorBuffer* r8TextureSelectMipmapLevel(R8Texture* texture, R8ubyte mipmap, R8texturesize* width, R8texturesize* height);
+const R8ColorBuffer* r8TextureSelectMipmapLevel(const R8Texture* texture, R8ubyte mipmap, R8texturesize* width, R8texturesize* height);
 
 R8ColorBuffer r8TextureSampleFromNearestMipmap(const R8ColorBuffer* mipTexels, R8texturesize mipWidth, R8texturesize mipHeight, R8float u, R8float v);
 

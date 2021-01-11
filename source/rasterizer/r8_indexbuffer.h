@@ -9,7 +9,6 @@
 
 #include "r8_types.h"
 
-#include <stdlib.h>
 #include <stdio.h>
 
 typedef struct R8IndexBuffer

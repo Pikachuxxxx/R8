@@ -5,10 +5,19 @@
  */
 
 #include "r8_texture.h"
+#include "r8_external_math.h"
+#include "r8_error.h"
+#include "r8_image.h"
+#include "r8_memory.h"
+#include "r8_state_machine.h"
+
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
  // --- internals --- //
 
-static R8void r8TextureSubImage2d(
+static R8void _texture_subimage2d(
     R8ColorBuffer* texels, R8ubyte mip, R8texturesize width, R8texturesize height, R8enum format, const R8void* data, R8bool dither)
 {
     if (format != R8_RGB)
@@ -116,7 +125,7 @@ static R8ubyte* _image_scale_down(R8texturesize width, R8texturesize height, R8e
     switch (format)
     {
     case R8_RGB:
-        return _image_scale_down_ubyte_rgb(width, height, (const PRubyte*)data);
+        return _image_scale_down_ubyte_rgb(width, height, (const R8ubyte*)data);
     default:
         break;
     }
@@ -137,13 +146,17 @@ R8Texture* r8TextureGenerate()
     for (size_t i = 0; i < R8_MAX_MIP_MAPS; ++i)
         texture->mipTexels[i] = NULL;
 
+    r8AddSMRef(texture);
+
     return texture;
 }
 
-R8void r8TextureDelete()
+R8void r8TextureDelete(R8Texture* texture)
 {
     if (texture != NULL)
     {
+        r8ReleaseSMRef(texture);
+
         R8_FREE(texture->texels);
         R8_FREE(texture);
     }
@@ -179,12 +192,12 @@ R8bool r8TextureImage2d(R8Texture* texture, R8texturesize width, R8texturesize h
     }
     if (width == 0 || height == 0)
     {
-        R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
+        r8SetError(R8_ERROR_INVALID_ARGUMENT, "Textures Size cannot be Zero");
         return R8_FALSE;
     }
     if (width > R8_MAX_TEXTURE_SIZE || height > R8_MAX_TEXTURE_SIZE)
     {
-        R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
+        r8SetError(R8_ERROR_INVALID_ARGUMENT, "Maximum Texture Size exceeded");
         return R8_FALSE;
     }
 
@@ -256,7 +269,7 @@ R8bool r8TextureImage2d(R8Texture* texture, R8texturesize width, R8texturesize h
     // Fill image data of first MIP level
     R8ColorBuffer* texels = texture->texels;
 
-    r8TextureSubImage2d(texels, 0, width, height, format, data, dither);
+    _texture_subimage2d(texels, 0, width, height, format, data, dither);
 
     if (generateMinmaps != R8_FALSE)
     {
@@ -273,6 +286,7 @@ R8bool r8TextureImage2d(R8Texture* texture, R8texturesize width, R8texturesize h
 
             if (mip > 1)
                 R8_FREE(prevData);
+
             prevData = (R8void*)data;
 
             if (data == NULL)
@@ -288,14 +302,13 @@ R8bool r8TextureImage2d(R8Texture* texture, R8texturesize width, R8texturesize h
                 height /= 2;
 
             // Fill image data for current MIP level
-            r8TextureSubImage2d(texels, mip, width, height, format, data, dither);
+            _texture_subimage2d(texels, mip, width, height, format, data, dither);
         }
 
         R8_FREE(prevData);
     }
 
     return R8_TRUE;
-
 }
 
 R8bool r8TextureSubImage2d(R8Texture* texture, R8ubyte mipmap, R8texturesize x, R8texturesize y, R8texturesize width, R8texturesize height, R8enum format, const R8void* data, R8bool dither)
@@ -306,14 +319,14 @@ R8bool r8TextureSubImage2d(R8Texture* texture, R8ubyte mipmap, R8texturesize x, 
         R8_ERROR(R8_ERROR_NULL_POINTER);
         return R8_FALSE;
     }
-    if (texture->texels == NULL || x < 0 || y < 0 || x + width >= texture->width || y + height >= texture->height || width <= 0 || height <= 0 || mip >= texture->mips)
+    if (texture->texels == NULL || x < 0 || y < 0 || x + width >= texture->width || y + height >= texture->height || width <= 0 || height <= 0 || mipmap >= texture->mips)
     {
         R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
         return R8_FALSE;
     }
 
     // Fill image data for specified MIP level
-    r8TextureSubImage2dRect(texture, mip, x, y, width, height, format, data);
+    r8TextureSubImage2dRect(texture, mipmap, x, y, width, height, format, data);
 
     return R8_TRUE;
 }
@@ -323,7 +336,7 @@ R8ubyte r8TextureNumMipMaps(R8ubyte maxSize)
     return maxSize > 0 ? (R8ubyte)(floorf(log2f(maxSize))) + 1 : 0;
 }
 
-const R8ColorBuffer* r8TextureSelectMipmapLevel(R8Texture* texture, R8ubyte mipmap, R8texturesize* width, R8texturesize* height)
+const R8ColorBuffer* r8TextureSelectMipmapLevel(const R8Texture* texture, R8ubyte mipmap, R8texturesize* width, R8texturesize* height)
 {
     // Return texel buffer (MIP-map 0) if there are no MIP-maps
     if (texture->mips == 0)
@@ -331,14 +344,14 @@ const R8ColorBuffer* r8TextureSelectMipmapLevel(R8Texture* texture, R8ubyte mipm
 
     // Add MIP level offset
     //mip = R8_CLAMP((R8ubyte)(((R8int)mip) + _stateMachine->textureLodBias), 0, texture->mips - 1);
-    mip = R8_CLAMP((R8ubyte)(((R8int)mip) + 0), 0, texture->mips - 1);
+    mipmap = R8_CLAMP((R8ubyte)(((R8int)mipmap) + 0), 0, texture->mips - 1);
 
     // Store mip size in output parameters
-    *width = R8_MIP_MAP_SIZE(texture->width, mip);
-    *height = R8_MIP_MAP_SIZE(texture->height, mip);
+    *width = R8_MIP_MAP_SIZE(texture->width, mipmap);
+    *height = R8_MIP_MAP_SIZE(texture->height, mipmap);
 
     // Return MIP-map texel offset
-    return texture->mipTexels[mip];
+    return texture->mipTexels[mipmap];
 }
 
 R8ColorBuffer r8TextureSampleFromNearestMipmap(const R8ColorBuffer* mipTexels, R8texturesize mipWidth, R8texturesize mipHeight, R8float u, R8float v)

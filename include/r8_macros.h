@@ -17,7 +17,9 @@
 #define R8_BBB                  0x00000005
 
 // GetString arguments
-#define R8_VERSION              0x00000010
+#define R8_STRING_VERSION       0x00000011
+#define R8_STRING_RENDERER      0x00000012
+#define R8_STRING_PLUGINS       0x00000013
 
 // GetInteger arguments
 #define R8_MAX_TEXTURE_SIZE     0x00000020
@@ -33,30 +35,34 @@
 #define R8_CULL_FRONT           0x00000041
 #define R8_CULL_BACK            0x00000042
                                  
-// Polygone drawing mode         
-#define R8_FILL                 0x00000050
-#define R8_LINE                 0x00000051
+// Polygon drawing mode         
+#define R8_POLYGON_FILL         0x00000050
+#define R8_POLYGON_LINE         0x00000051
+#define R8_POLYGON_POINT        0x00000052
 
 // Texture Parameters
-#define R8_MAX_TEXTURE_WIDTH    0x00000060
-#define R8_MAX_TEXTURE_HEIGHT   0x00000061
+//#define R8_MAX_TEXTURE_WIDTH    0x00000060
+//#define R8_MAX_TEXTURE_HEIGHT   0x00000061
 #define R8_TEXTURE_WIDTH        0x00000062
 #define R8_TEXTURE_HEIGHT       0x00000063
-#define R8_MAG_FILTER           0x00000064
-#define R8_MIN_FILTER           0x00000065
-#define R8_TEXTURE_S            0x00000066
-#define R8_TEXTURE_T            0x00000066
-#define R8_LINEAR               0x00000067
-#define R8_CLAMP                0x00000068
-#define R8_REPEAT               0x0000006A
+//#define R8_MAG_FILTER           0x00000064
+//#define R8_MIN_FILTER           0x00000065
+//#define R8_TEXTURE_S            0x00000066
+//#define R8_TEXTURE_T            0x00000066
+//#define R8_LINEAR               0x00000067
+//#define R8_CLAMP                0x00000068
+//#define R8_REPEAT               0x0000006A
 
 // rendering states
-#define R8_WIREFRAME_MODE       0x00000070
-#define R8_SCISSOR_MODE         0x00000071
-#define R8_MIPMAP_MODE          0x00000072
+#define R8_SCISSOR_MODE         0
+#define R8_MIPMAP_MODE          1
+#define R8_WIREFRAME_MODE       2
 
-// Frame buffer flags
-#define R8_COLOR_BUFFER_BIT     0x00000080
-#define R8_DEPTH_BUFFER_BIT     0x00000081
+// Texture Environment parameters
+#define R8_TEXTURE_LOD_BIAS     0
+
+// Frame buffer clear flags
+#define R8_COLOR_BUFFER_BIT     0x00000001
+#define R8_DEPTH_BUFFER_BIT     0x00000002
 
 #endif

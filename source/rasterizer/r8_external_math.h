@@ -11,27 +11,32 @@
 #include "r8_config.h"
 #include "r8_constants.h"
 
-#define R8_MAX(a, b)        ((a) < (b) ? (b) : (a))
-#define R8_MIN(a, b)        ((a) < (b) ? (a) : (b))
+#define R8_MAX(a, b)            ((a) < (b) ? (b) : (a))
+#define R8_MIN(a, b)            ((a) < (b) ? (a) : (b))
 
-#define R8_CLAMP(x, a, b)   ((x) < (a) ? (a) : ((x) > (b) ? (b) : (x)))
+#define R8_CLAMP(x, a, b)       ((x) < (a) ? (a) : ((x) > (b) ? (b) : (x)))
 
-#define R8_SQR(x)           x * x
+#define R8_CLAMP_LARGEST(x, c)  if ((x) < (c)) x = c
+#define R8_CLAMP_SMALLEST(x, c) if ((x) > (c)) x = c
 
-#define R8_SWAP(T, a, b)    \
-    {                       \
-        T _tmp = a;         \
-        a = b;              \
-        b = _tmp;           \
+#define R8_SIGNUM(x)            (((x) > 0) ? 1 : ((x) < 0) ? -1 : 0)
+
+#define R8_SQR(x)               x * x
+
+#define R8_SWAP(T, a, b)        \
+    {                           \
+        T _tmp = a;             \
+        a = b;                  \
+        b = _tmp;               \
     }
 
 // The bitwise XOR operator can be used to swap two non-floating point numbers
-#define R8_SWAP_INT(a, b)   \
-    {                       \
-        a ^= b;             \
-        b ^= a;             \
-        a ^= b              \
-                            \
+#define R8_SWAP_INT(a, b)       \
+    {                           \
+        a ^= b;                 \
+        b ^= a;                 \
+        a ^= b                  \
+                                \
     }
 
 #ifdef R8_FAST_MATH
@@ -55,6 +60,7 @@ R8float r8ApproxCos(R8float x);
 /// Calculate the approximated and fast value for inverse square root
 R8float r8ApproxFastInvSqrt(R8float x);
 
+/// Calculates the integral value of log base 2
 R8int r8ApproxIntLog2(R8float x);
 
 #endif

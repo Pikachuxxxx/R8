@@ -5,14 +5,16 @@
  */
 
 #include "r8_framebuffer.h"
+#include "r8_error.h"
+#include "r8_memory.h"
+#include "r8_state_machine.h"
+#include "r8_color_palette.h"
 
-#include <stdlib.h>
-#include <string.h>
-
+#include <string.h> // memset
 
 R8FrameBuffer* r8FrameBufferGenerate(R8uint width, R8uint height)
 {
-    if (widht == 0 || height == 0)
+    if (width == 0 || height == 0)
     {
         R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
         return NULL;
@@ -50,7 +52,7 @@ R8void r8FrameBufferClear(R8FrameBuffer* framebuffer, R8float clearDepth, R8bit 
         R8DepthBuffer depth = r8WriteRealDepthToBuffer(clearDepth);
 
         // Get clear color from state machine (and optionally its color index)
-        //PRcolorindex clearColor = PR_STATE_MACHINE.clearColor;
+        R8ColorBuffer clearColor = R8_STATE_MACHINE.clearColor;
 
         // Iterate over the entire framebuffer
         R8Pixel* dst = framebuffer->pixels;
@@ -61,7 +63,7 @@ R8void r8FrameBufferClear(R8FrameBuffer* framebuffer, R8float clearDepth, R8bit 
             while (dst != dstEnd)
             {
                 dst->colorBuffer = 0xff;    // clear color
-                dst->depth = depth;
+                dst->depthBuffer = depth;
                 ++dst;
             }
         }
@@ -77,7 +79,7 @@ R8void r8FrameBufferClear(R8FrameBuffer* framebuffer, R8float clearDepth, R8bit 
         {
             while (dst != dstEnd)
             {
-                dst->depth = depth;
+                dst->depthBuffer = depth;
                 ++dst;
             }
         }
@@ -86,14 +88,14 @@ R8void r8FrameBufferClear(R8FrameBuffer* framebuffer, R8float clearDepth, R8bit 
         R8_ERROR(R8_ERROR_NULL_POINTER);
 }
 
-R8void r8FrameBufferSetupScanlines(R8FrameBuffer* framebuffer, R8SideScanline* sides, R8RasterVertex* start, R8RasterVertex* end)
+R8void r8FrameBufferSetupScanlines(R8FrameBuffer* framebuffer, R8SideScanline* sides, R8RasterVertex start, R8RasterVertex end)
 {
     R8int pitch = (R8int)framebuffer->width;
     R8int len = end.y - start.y;
 
     if (len <= 0)
     {
-        sides[start.y].offset = start.y * pitch + start.x;
+        sides[start.y].pixelOffset = start.y * pitch + start.x;
         return;
     }
 
@@ -112,7 +114,7 @@ R8void r8FrameBufferSetupScanlines(R8FrameBuffer* framebuffer, R8SideScanline* s
     for (sides += start.y; sides <= sidesEnd; ++sides)
     {
         // Setup scan line side
-        sides->offset = (R8int)(offsetStart + 0.5);
+        sides->pixelOffset = (R8int)(offsetStart + 0.5);
         sides->z = start.z;
         sides->u = start.u;
         sides->v = start.v;

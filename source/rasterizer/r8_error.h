@@ -11,7 +11,7 @@
 #include "r8_error_codes.h"
 
 #define R8_ERROR(err)   r8SetError(err, __FUNCTION__)
-#define R8_SET_FATAL_ERROR(err)  r8SetError(R8_ERROR_FATAL, __FUNCTION__)
+#define R8_SET_FATAL_ERROR(msg)  r8SetError(R8_ERROR_FATAL, msg)
 
 R8void r8SetError(R8enum errorID, const char* msg);
 R8enum r8GetErrorCode();

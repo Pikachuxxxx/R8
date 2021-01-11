@@ -60,12 +60,12 @@ R8float r8ApproxFastInvSqrt(R8float x)
 R8int r8ApproxIntLog2(R8float x)
 {
     #ifdef R8_FAST_MATH
-    unsigned long* ix = (unsigned long*)(&x);
-    unsigned long exp = ((*ix) >> 23) & 0xff;
-    return (R8int)exp - 127;
+        unsigned long* ix = (unsigned long*)(&x);
+        unsigned long exp = ((*ix) >> 23) & 0xff;
+        return (R8int)exp - 127;
     #else
-    int y;
-    frexpf(x, &y);
-    return y - 1;
+        int y;
+        frexpf(x, &y);
+        return y - 1;
     #endif
 }

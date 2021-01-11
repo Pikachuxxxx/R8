@@ -88,6 +88,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\;$(ProjectDir)source\rasterizer\;$(ProjectDir)source\platform\win32\;$(ProjectDir)source\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -102,6 +103,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\;$(ProjectDir)source\rasterizer\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -116,6 +118,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\;$(ProjectDir)source\rasterizer\;$(ProjectDir)source\;$(ProjectDir)source\platform\win32\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -130,6 +133,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\;$(ProjectDir)source\rasterizer\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -140,6 +144,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="include\r8_constants.h" />
+    <ClCompile Include="source\main.c" />
+    <ClCompile Include="source\platform\win32\context.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="source\r8.c" />
     <ClCompile Include="source\rasterizer\r8_color_palette.c" />
     <ClCompile Include="source\rasterizer\r8_error.c" />
@@ -150,6 +161,8 @@
     <ClCompile Include="source\rasterizer\r8_indexbuffer.c" />
     <ClCompile Include="source\rasterizer\r8_matrix4.c" />
     <ClCompile Include="source\rasterizer\r8_quad.c" />
+    <ClCompile Include="source\rasterizer\r8_renderer.c" />
+    <ClCompile Include="source\rasterizer\r8_state_machine.c" />
     <ClCompile Include="source\rasterizer\r8_texture.c" />
     <ClCompile Include="source\rasterizer\r8_vertex.c" />
     <ClCompile Include="source\rasterizer\r8_vertexbuffer.c" />
@@ -163,6 +176,12 @@
     <ClInclude Include="include\r8_platform.h" />
     <ClInclude Include="include\r8_structs.h" />
     <ClInclude Include="include\r8_types.h" />
+    <ClInclude Include="source\platform\win32\context.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="source\rasterizer\r8_color.h" />
     <ClInclude Include="source\rasterizer\r8_color_palette.h" />
     <ClInclude Include="source\rasterizer\r8_config.h" />
@@ -178,6 +197,7 @@
     <ClInclude Include="source\rasterizer\r8_quad.h" />
     <ClInclude Include="source\rasterizer\r8_raster_triangle.h" />
     <ClInclude Include="source\rasterizer\r8_raster_vertex.h" />
+    <ClInclude Include="source\rasterizer\r8_renderer.h" />
     <ClInclude Include="source\rasterizer\r8_state_machine.h" />
     <ClInclude Include="source\rasterizer\r8_texture.h" />
     <ClInclude Include="source\rasterizer\r8_vertex.h" />

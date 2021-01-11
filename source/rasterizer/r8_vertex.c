@@ -5,9 +5,9 @@
  */
 
 #include "r8_vertex.h"
+#include <string.h> // For memset
 
-
-R8void r8InitVertex(R8Vertex vertex)
+R8void r8InitVertex(R8Vertex* vertex)
 {
     if (vertex != NULL)
         memset(vertex, 0, sizeof(R8Vertex));
