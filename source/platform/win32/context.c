@@ -1,4 +1,5 @@
-/* context.c
+/*
+ * context.c 
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.
@@ -8,13 +9,14 @@
 #include "r8_error.h"
 #include "r8_memory.h"
 
-R8Context* currentContext_ = NULL;
 
-R8Context* r8ContextCreate(const R8ContextDesc* desc, R8uint width, R8uint height)
+R8Context* _currentContext = NULL;
+
+R8Context* r8_context_create(const R8contextdesc* desc, R8uint width, R8uint height)
 {
     if (desc == NULL || desc->window == NULL || width <= 0 || height <= 0)
     {
-        R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
+        r8_error_set(R8_ERROR_INVALID_ARGUMENT, __FUNCTION__);
         return NULL;
     }
 
@@ -23,43 +25,42 @@ R8Context* r8ContextCreate(const R8ContextDesc* desc, R8uint width, R8uint heigh
 
     // Setup bitmap info structure
     BITMAPINFO* bmi = (&context->bmpInfo);
-
     memset(bmi, 0, sizeof(BITMAPINFO));
 
-    bmi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi->bmiHeader.biWidth = (LONG)width;
-    bmi->bmiHeader.biHeight = (LONG)height;
-    bmi->bmiHeader.biPlanes = 1;
-    bmi->bmiHeader.biBitCount = 24;
-    bmi->bmiHeader.biCompression = BI_RGB;
+    bmi->bmiHeader.biSize           = sizeof(BITMAPINFOHEADER);
+    bmi->bmiHeader.biWidth          = (LONG)width;
+    bmi->bmiHeader.biHeight         = (LONG)height;
+    bmi->bmiHeader.biPlanes         = 1;
+    bmi->bmiHeader.biBitCount       = 24;
+    bmi->bmiHeader.biCompression    = BI_RGB;
 
     // Setup context
-    context->window = *((HWND*)desc->window);
-    context->dc = GetDC(context->window);
-    context->dcBmp = CreateCompatibleDC(context->dc);
-    context->bmp = CreateCompatibleBitmap(context->dc, width, height);
-    context->colors = R8_CALLOC(R8ColorPalette, width * height);
-    context->width = width;
-    context->height = height;
+    context->wnd        = *((HWND*)desc->window);
+    context->dc         = GetDC(context->wnd);
+    context->dcBmp      = CreateCompatibleDC(context->dc);
+    context->bmp        = CreateCompatibleBitmap(context->dc, width, height);
+    context->colors     = R8_CALLOC(R8Color, width*height);
+    context->width      = width;
+    context->height     = height;
 
     SelectObject(context->dcBmp, context->bmp);
 
     // Create color palette
     context->colorPalette = R8_MALLOC(R8ColorPalette);
-    r8FillColorPalette(context->colorPalette);
+    r8_color_palette_fill_r3g3b2(context->colorPalette);
 
     // Initialize state machine
-    r8InitStateMachine(&(context->stateMachine));
-    r8ContextMakeCurrent(context);
+    r8_state_machine_init(&(context->stateMachine));
+    r8_context_makecurrent(context);
 
     return context;
 }
 
-R8void r8ContextDelete(R8Context* context)
+void r8_context_delete(R8Context* context)
 {
     if (context != NULL)
     {
-        r8AssertSMRef(&(context->stateMachine));
+        r8_ref_assert(&(context->stateMachine));
 
         if (context->bmp != NULL)
             DeleteObject(context->bmp);
@@ -72,30 +73,30 @@ R8void r8ContextDelete(R8Context* context)
     }
 }
 
-R8void r8ContextMakeCurrent(R8Context* context)
+void r8_context_makecurrent(R8Context* context)
 {
-    currentContext_ = context;
+    _currentContext = context;
     if (context != NULL)
-        r8StateMachineMakeCurrent(&(context->stateMachine));
+        r8_state_machine_makecurrent(&(context->stateMachine));
     else
-        r8StateMachineMakeCurrent(NULL);
+        r8_state_machine_makecurrent(NULL);
 }
 
-R8void r8ContextPresent(R8Context* context, const R8FrameBuffer* framebuffer)
+void r8_context_present(R8Context* context, const R8FrameBuffer* framebuffer)
 {
     if (context == NULL || framebuffer == NULL)
     {
-        R8_ERROR(R8_ERROR_NULL_POINTER);
+        r8_error_set(R8_ERROR_NULL_POINTER, __FUNCTION__);
         return;
     }
     if (context->width != framebuffer->width || context->height != framebuffer->height)
     {
-        R8_ERROR(R8_ERROR_ARGUMENT_MISMATCH);
+        r8_error_set(R8_ERROR_ARGUMENT_MISMATCH, __FUNCTION__);
         return;
     }
 
     // Get iterators
-    const R8uint num = context->width * context->height;
+    const R8uint num = context->width*context->height;
 
     R8Color* dst = context->colors;
     R8Color* dstEnd = dst + num;
@@ -103,16 +104,22 @@ R8void r8ContextPresent(R8Context* context, const R8FrameBuffer* framebuffer)
     const R8Pixel* pixels = framebuffer->pixels;
     const R8Color* palette = context->colorPalette->colors;
 
+    #ifndef R8_COLOR_BUFFER_24BIT
     const R8Color* paletteColor;
+    #endif
 
     // Iterate over all pixels
     while (dst != dstEnd)
     {
-        paletteColor = (palette + pixels->colorBuffer);
+        #ifdef R8_COLOR_BUFFER_24BIT
+        *dst = pixels->colorIndex;
+        #else
+        paletteColor = (palette + pixels->colorIndex);
 
         dst->r = paletteColor->r;
         dst->g = paletteColor->g;
         dst->b = paletteColor->b;
+        #endif
 
         ++dst;
         ++pixels;

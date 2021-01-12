@@ -1,28 +1,39 @@
-/* r8_vertex.h
+/*
+ * r8_vertex.h
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.
  */
 
-#ifndef R_8_VERTEX_H
-#define R_8_VERTEX_H
+#ifndef R8_VERTEX_H
+#define R8_VERTEX_H
 
-#include "r8_types.h"
-#include "r8_structs.h"
+
+#include "r8_vector2.h"
+#include "r8_vector3.h"
+#include "r8_vector4.h"
+#include "r8_matrix4.h"
 #include "r8_config.h"
 
+
+// Simple vertex with 3D coordinate and 2D texture-coordinate.
 typedef struct R8Vertex
 {
-    R8Vec4 position;
-    R8Vec2 uv;
-    R8Vec4 color;
+    // Before vertex processing
+    R8Vector4 coord;       // Original coordinate.
+    R8Vector2 texCoord;    // Texture-coordinate.
 
-    R8Vec4 ndc; // Normalized device coordinates [-1, 1]
-    #ifdef R8_PERSPECTIVE_DEPTH_CORRECTED
-        R8Vec2 invTexCoord;
+    #if 1// remove!
+    R8Vector4 ndc;         // Normalized device coordinate.
+    #ifdef R8_PERSPECTIVE_CORRECTED
+    R8Vector2 invTexCoord; // Inverse texture-coordinates.
     #endif
-}R8Vertex;
+    #endif
+}
+R8Vertex;
 
-R8void r8InitVertex(R8Vertex* vertex);
+
+void r8_vertex_init(R8Vertex* vertex);
+
 
 #endif

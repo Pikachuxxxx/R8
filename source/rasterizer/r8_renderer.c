@@ -1,8 +1,10 @@
-/* r8_renderer.c
+/*
+ * r8_renderer.c
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.
  */
+
 
 #include "r8_renderer.h"
 #include "r8_state_machine.h"
@@ -13,55 +15,71 @@
 #include "r8_error.h"
 #include "r8_config.h"
 
-/********** Internal **********/
+#include <stdio.h>
+#include <math.h>
 
-#define R8_MAX_NUM_POLY_VERTS   32
 
-static R8ClipVertex clipVertices_[R8_MAX_NUM_POLY_VERTS], clipVerticesTemp_[R8_MAX_NUM_POLY_VERTS];
-static R8RasterVertex rasterVertices_[R8_MAX_NUM_POLY_VERTS], rasterVerticesTemp_[R8_MAX_NUM_POLY_VERTS];
-static R8int numPolyVertices_ = 0;
+// --- internals ---
 
-#define R8_CLIP_VERT_VEC2(v)    (*(R8Vec2*)(&(clipVertices_[v].x)))
+#define MAX_NUM_POLYGON_VERTS 32
 
-static R8void transform_vertexbuffer(R8sizei numVertices, R8sizei firstVertex, R8VertexBuffer* vertexbuffer)
+static R8ClipVertex _clipVertices[MAX_NUM_POLYGON_VERTS], _clipVerticesTmp[MAX_NUM_POLYGON_VERTS];
+static R8RasterVertex _rasterVertices[MAX_NUM_POLYGON_VERTS], _rasterVerticesTmp[MAX_NUM_POLYGON_VERTS];
+static R8int _numPolyVerts = 0;
+
+#define _CVERT_VEC2(v) (*(R8Vector2*)(&((_clipVertices[v]).x)))
+
+static void _vertexbuffer_transform(R8sizei numVertices, R8sizei firstVertex, R8VertexBuffer* vertexBuffer)
 {
-    r8VertexBufferTransformVertices(numVertices, firstVertex, vertexbuffer, &(R8_STATE_MACHINE.MVPMatrix), &(R8_STATE_MACHINE.viewport));
+    r8_vertexbuffer_transform(
+        numVertices,
+        firstVertex,
+        vertexBuffer,
+        &(R8_STATE_MACHINE.worldViewProjectionMatrix),
+        &(R8_STATE_MACHINE.viewport)
+    );
 }
 
-static R8void transform_all_vertexbuffer(R8VertexBuffer* vertexbuffer)
+static void _vertexbuffer_transform_all(R8VertexBuffer* vertexBuffer)
 {
-    r8VertexBufferTransformAllVertices(vertexbuffer, &(R8_STATE_MACHINE.MVPMatrix), &(R8_STATE_MACHINE.viewport));
+    r8_vertexbuffer_transform_all(
+        vertexBuffer,
+        &(R8_STATE_MACHINE.worldViewProjectionMatrix),
+        &(R8_STATE_MACHINE.viewport)
+    );
 }
 
-static R8void transform_vertex(R8ClipVertex* clipVert, const R8Vertex* vert)
+static void _transform_vertex(R8ClipVertex* clipVert, const R8Vertex* vert)
 {
-    r8Mat4MultiplyFloat4(&(clipVert->x), &(R8_STATE_MACHINE.MVPMatrix), &(vert->position.x));
-    clipVert->u = vert->uv.x;
-    clipVert->v = vert->uv.y;
+    r8_matrix_mul_float4(&(clipVert->x), &(R8_STATE_MACHINE.worldViewProjectionMatrix), &(vert->coord.x));
+    clipVert->u = vert->texCoord.x;
+    clipVert->v = vert->texCoord.y;
 }
 
-static R8void project_vertex(R8ClipVertex* clipVert, const R8Viewport* viewport)
+static void _r8oject_vertex(R8ClipVertex* vertex, const R8Viewport* viewport)
 {
-    // Transform the coords into NDC
-    R8float ndc_w = 1.0f / clipVert->w;
+    // Transform coordinate into normalized device coordinates
+    //vertex->z = 1.0f / vertex->w;
+    R8float rhw = 1.0f / vertex->w;
 
-    clipVert->x *= ndc_w;
-    clipVert->y *= ndc_w;
-    clipVert->z  = ndc_w;
+    vertex->x *= rhw;
+    vertex->y *= rhw;
+    //vertex->z *= rhw;
+    vertex->z = rhw;
 
-    // Transform vertex to screen coordinate (+0.5 is for rounding adjustment)
-    clipVert->x = viewport->x + (clipVert->x + 1.0f) * viewport->halfWidth + 0.5f;
-    clipVert->y = viewport->y + (clipVert->y + 1.0f) * viewport->halfHeight + 0.5f;
+    // Transform vertex to screen coordiante (+0.5 is for rounding adjustment)
+    vertex->x = viewport->x + (vertex->x + 1.0f) * viewport->halfWidth + 0.5f;
+    vertex->y = viewport->y + (vertex->y + 1.0f) * viewport->halfHeight + 0.5f;
     //vertex->z = viewport->minDepth + vertex->z * viewport->depthSize;
 
-    #ifdef R8_PERSPECTIVE_DEPTH_CORRECTED
-        // Setup inverse texture coordinates
-        clipVert->u *= ndc_w;
-        clipVert->v *= ndc_w;
+    #ifdef R8_PERSPECTIVE_CORRECTED
+    // Setup inverse texture coordinates
+    vertex->u *= rhw;
+    vertex->v *= rhw;
     #endif
 }
 
-static R8void setup_raster_vertex(R8RasterVertex* rasterVert, const R8ClipVertex* clipVert)
+static void _setup_raster_vertex(R8RasterVertex* rasterVert, const R8ClipVertex* clipVert)
 {
     rasterVert->x = (R8int)(clipVert->x);
     rasterVert->y = (R8int)(clipVert->y);
@@ -70,12 +88,12 @@ static R8void setup_raster_vertex(R8RasterVertex* rasterVert, const R8ClipVertex
     rasterVert->v = clipVert->v;
 }
 
-// Returns true if the specified triangle vertices are culled
-static R8bool is_triangle_culled(const R8Vec2 a, const R8Vec2 b, const R8Vec2 c)
+// Returns R8_TRUE if the specified triangle vertices are culled.
+static R8boolean _is_triangle_culled(const R8Vector2 a, const R8Vector2 b, const R8Vector2 c)
 {
     if (R8_STATE_MACHINE.cullMode != R8_CULL_NONE)
     {
-        const R8float vis = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+        const R8float vis = (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x);
 
         if (R8_STATE_MACHINE.cullMode == R8_CULL_FRONT)
         {
@@ -91,12 +109,12 @@ static R8bool is_triangle_culled(const R8Vec2 a, const R8Vec2 b, const R8Vec2 c)
     return R8_FALSE;
 }
 
-/********** Points **********/
+// --- points --- //
 
-R8void r8RenderScreenSpacePoint(R8int x, R8int y)
+void r8_render_screenspace_point(R8int x, R8int y)
 {
     // Validate bound frame buffer
-    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.boundFrameBuffer;
 
     if (frameBuffer == NULL)
     {
@@ -104,25 +122,25 @@ R8void r8RenderScreenSpacePoint(R8int x, R8int y)
         return;
     }
 
-    if (x < 0 || x >= (R8int)frameBuffer->width ||
-        y < 0 || y >= (R8int)frameBuffer->height)
+    if ( x < 0 || x >= (R8int)frameBuffer->width ||
+         y < 0 || y >= (R8int)frameBuffer->height )
     {
         R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
         return;
     }
 
-    #ifdef R8_ORIGIN_TOP_LEFT
+    #ifdef R8_ORIGIN_LEFT_TOP
     y = frameBuffer->height - y - 1;
     #endif
 
     // Plot screen space point
-    r8FrameBufferPlot(frameBuffer, x, y, R8_STATE_MACHINE.color0);
+    r8_framebuffer_plot(frameBuffer, x, y, R8_STATE_MACHINE.color0);
 }
 
-R8void r8RenderPoints(R8sizei numVertices, R8sizei firstVertex, R8VertexBuffer* vertexbuffer)
+void r8_render_points(R8sizei numVertices, R8sizei firstVertex, /*const */R8VertexBuffer* vertexBuffer)
 {
     // Validate bound frame buffer
-    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.boundFrameBuffer;
 
     if (frameBuffer == NULL)
     {
@@ -131,20 +149,20 @@ R8void r8RenderPoints(R8sizei numVertices, R8sizei firstVertex, R8VertexBuffer* 
     }
 
     // Validate vertex buffer
-    if (vertexbuffer == NULL)
+    if (vertexBuffer == NULL)
     {
         R8_ERROR(R8_ERROR_NULL_POINTER);
         return;
     }
 
-    if (firstVertex + numVertices >= vertexbuffer->numVerts)
+    if (firstVertex + numVertices >= vertexBuffer->numVertices)
     {
         R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
         return;
     }
 
     // Transform vertices
-    transform_vertexbuffer(numVertices, firstVertex, vertexbuffer);
+    _vertexbuffer_transform(numVertices, firstVertex, vertexBuffer);
 
     // Render points
     R8Vertex* vert;
@@ -154,47 +172,48 @@ R8void r8RenderPoints(R8sizei numVertices, R8sizei firstVertex, R8VertexBuffer* 
 
     for (; firstVertex < numVertices; ++firstVertex)
     {
-        vert = (vertexbuffer->vertices + firstVertex);
+        vert = (vertexBuffer->vertices + firstVertex);
 
         x = (R8uint)(vert->ndc.x);
-        #ifdef R8_ORIGIN_TOP_LEFT
-            y = frameBuffer->height - (R8uint)(vert->ndc.y) - 1;
+        #ifdef R8_ORIGIN_LEFT_TOP
+        y = frameBuffer->height - (R8uint)(vert->ndc.y) - 1;
         #else
-            y = (R8uint)(vert->ndc.y);
+        y = (R8uint)(vert->ndc.y);
         #endif
 
         if (x < width && y < height)
-            r8FrameBufferPlot(frameBuffer, x, y, R8_STATE_MACHINE.color0);
+            r8_framebuffer_plot(frameBuffer, x, y, R8_STATE_MACHINE.color0);
     }
 }
 
-R8void r8RenderIndexedPoints(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer, const R8IndexBuffer* indexbuffer)
+void r8_render_indexed_points(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
 {
-    // TODO: To be implemented
+    //...
 }
 
-/********** Lines **********/
+// --- lines --- //
 
-// This function implements the line "Bresenham" algorithm
-static R8void render_screenspace_line_colored(R8int x1, R8int y1, R8int x2, R8int y2)
+// This function implements the line "bresenham" algorithm.
+static void _render_screenspace_line_colored(R8int x1, R8int y1, R8int x2, R8int y2)
 {
-    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+    // Get bound frame buffer
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.boundFrameBuffer;
 
-    if (x1 < 0 || x1 >= (R8int)frameBuffer->width   ||
-        x2 < 0 || x2 >= (R8int)frameBuffer->width   ||
-        y1 < 0 || y1 >= (R8int)frameBuffer->height  ||
-        y2 < 0 || y2 >= (R8int)frameBuffer->height)
+    if ( x1 < 0 || x1 >= (R8int)frameBuffer->width ||
+         x2 < 0 || x2 >= (R8int)frameBuffer->width ||
+         y1 < 0 || y1 >= (R8int)frameBuffer->height ||
+         y2 < 0 || y2 >= (R8int)frameBuffer->height )
     {
         R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
         return;
     }
 
-    // Pre-computations
+    // Pre-compuations
     int dx = x2 - x1;
     int dy = y2 - y1;
 
-    int incx = R8_SIGNUM(dx);
-    int incy = R8_SIGNUM(dy);
+    int incx = R8_SIGN(dx);
+    int incy = R8_SIGN(dy);
 
     if (dx < 0)
         dx = -dx;
@@ -209,8 +228,8 @@ static R8void render_screenspace_line_colored(R8int x1, R8int y1, R8int x2, R8in
         pdy = 0;
         ddx = incx;
         ddy = incy;
-        es = dy;
-        el = dx;
+        es  = dy;
+        el  = dx;
     }
     else
     {
@@ -218,22 +237,22 @@ static R8void render_screenspace_line_colored(R8int x1, R8int y1, R8int x2, R8in
         pdy = incy;
         ddx = incx;
         ddy = incy;
-        es = dx;
-        el = dy;
+        es  = dx;
+        el  = dy;
     }
 
     if (el == 0)
         return;
 
-    int x = x1;
-    int y = y1;
-    int err = el / 2;
+    int x   = x1;
+    int y   = y1;
+    int err = el/2;
 
     // Render each pixel of the line
     for (int t = 0; t < el; ++t)
     {
         // Render pixel
-        r8FrameBufferPlot(R8_STATE_MACHINE.framebuffer, (R8uint)x, (R8uint)y, R8_STATE_MACHINE.color0);
+        r8_framebuffer_plot(R8_STATE_MACHINE.boundFrameBuffer, (R8uint)x, (R8uint)y, R8_STATE_MACHINE.color0);
 
         // Move to next pixel
         err -= es;
@@ -252,21 +271,21 @@ static R8void render_screenspace_line_colored(R8int x1, R8int y1, R8int x2, R8in
 }
 
 // Rasterizes a textured line using the "Bresenham" algorithm
-static R8void rasterize_line(R8FrameBuffer* framebuffer, const R8Texture* texture, R8ubyte mipLevel, R8int indexA, R8int indexB)
+static void _rasterize_line(R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel, R8uint indexA, R8uint indexB)
 {
-    const R8RasterVertex* vertexA = &(rasterVertices_[indexA]);
-    const R8RasterVertex* vertexB = &(rasterVertices_[indexB]);
+    const R8RasterVertex* vertexA = &(_rasterVertices[indexA]);
+    const R8RasterVertex* vertexB = &(_rasterVertices[indexB]);
 
     // Select MIP level
-    R8texturesize mipWidth = 0, mipHeight = 0;
-    const R8ColorBuffer* texels = r8TextureSelectMipmapLevel(texture, mipLevel, &mipWidth, &mipHeight);
+    R8texsize mipWidth = 0, mipHeight = 0;
+    const R8ColorBuffer* texels = r8_texture_select_miplevel(texture, mipLevel, &mipWidth, &mipHeight);
 
     // Pre-computations
     int dx = vertexB->x - vertexA->x;
     int dy = vertexB->y - vertexA->y;
 
-    int incx = R8_SIGNUM(dx);
-    int incy = R8_SIGNUM(dy);
+    int incx = R8_SIGN(dx);
+    int incy = R8_SIGN(dy);
 
     if (dx < 0)
         dx = -dx;
@@ -281,8 +300,8 @@ static R8void rasterize_line(R8FrameBuffer* framebuffer, const R8Texture* textur
         pdy = 0;
         ddx = incx;
         ddy = incy;
-        es = dy;
-        el = dx;
+        es  = dy;
+        el  = dx;
     }
     else
     {
@@ -290,8 +309,8 @@ static R8void rasterize_line(R8FrameBuffer* framebuffer, const R8Texture* textur
         pdy = incy;
         ddx = incx;
         ddy = incy;
-        es = dx;
-        el = dy;
+        es  = dx;
+        el  = dy;
     }
 
     if (el == 0)
@@ -310,7 +329,7 @@ static R8void rasterize_line(R8FrameBuffer* framebuffer, const R8Texture* textur
         vStep = (vertexB->v - vertexA->v) / (el - 1);
     }
 
-    int err = el / 2;
+    int err = el/2;
 
     R8ColorBuffer colorIndex;
 
@@ -318,9 +337,9 @@ static R8void rasterize_line(R8FrameBuffer* framebuffer, const R8Texture* textur
     for (R8int t = 0; t < el; ++t)
     {
         // Render pixel
-        colorIndex = r8TextureSampleFromNearestMipmap(texels, mipWidth, mipHeight, (R8float)u, (R8float)v);
+        colorIndex = r8_texture_sample_nearest_from_mipmap(texels, mipWidth, mipHeight, (R8float)u, (R8float)v);
 
-        r8FrameBufferPlot(framebuffer, (R8uint)x, (R8uint)y, colorIndex);
+        r8_framebuffer_plot(frameBuffer, (R8uint)x, (R8uint)y, colorIndex);
 
         // Increase tex-coords
         u += uStep;
@@ -342,31 +361,35 @@ static R8void rasterize_line(R8FrameBuffer* framebuffer, const R8Texture* textur
     }
 }
 
-static R8void render_indexed_linex_textured(const R8Texture* texture, R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
+static void _render_indexed_lines_textured(
+    const R8Texture* texture, R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
 {
-    // TODO: To be implemented yet
+    //...
 }
 
-static R8void render_indexed_lines_colored(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer, const R8IndexBuffer* indexbuffer)
+static void _render_indexed_lines_colored(
+    R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
 {
+    //r8_framebuffer* frameBuffer = R8_STATE_MACHINE.boundFrameBuffer;
+
     // Iterate over the index buffer
     for (R8sizei i = firstVertex, n = numVertices + firstVertex; i + 1 < n; i += 2)
     {
         // Fetch indices
-        R8ushort indexA = indexbuffer->indices[i];
-        R8ushort indexB = indexbuffer->indices[i + 1];
+        R8ushort indexA = indexBuffer->indices[i];
+        R8ushort indexB = indexBuffer->indices[i + 1];
 
         #ifdef R8_DEBUG
-            if (indexA >= vertexbuffer->numVerts || indexB >= vertexbuffer->numVerts)
-            {
-                R8_SET_FATAL_ERROR("element in index buffer out of bounds");
-                return;
-            }
+        if (indexA >= vertexBuffer->numVertices || indexB >= vertexBuffer->numVertices)
+        {
+            R8_SET_ERROR_FATAL("element in index buffer out of bounds");
+            return;
+        }
         #endif
 
         // Fetch vertices
-        const R8Vertex* vertexA = (vertexbuffer->vertices + indexA);
-        const R8Vertex* vertexB = (vertexbuffer->vertices + indexB);
+        const R8Vertex* vertexA = (vertexBuffer->vertices + indexA);
+        const R8Vertex* vertexB = (vertexBuffer->vertices + indexB);
 
         // Raster line
         R8int x1 = (R8int)vertexA->ndc.x;
@@ -375,15 +398,14 @@ static R8void render_indexed_lines_colored(R8sizei numVertices, R8sizei firstVer
         R8int x2 = (R8int)vertexB->ndc.x;
         R8int y2 = (R8int)vertexB->ndc.y;
 
-        render_screenspace_line_colored(x1, y1, x2, y2);
+        _render_screenspace_line_colored(x1, y1, x2, y2);
     }
 }
 
-
-R8void r8RenderScreenSpaceLine(R8int x1, R8int y1, R8int x2, R8int y2)
+void r8_render_screenspace_line(R8int x1, R8int y1, R8int x2, R8int y2)
 {
     // Get bound frame buffer
-    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.boundFrameBuffer;
 
     if (frameBuffer == NULL)
     {
@@ -391,61 +413,81 @@ R8void r8RenderScreenSpaceLine(R8int x1, R8int y1, R8int x2, R8int y2)
         return;
     }
 
-    #ifdef R8_ORIGIN_TOP_LEFT
-        y1 = frameBuffer->height - y1 - 1;
-        y2 = frameBuffer->height - y2 - 1;
+    #ifdef R8_ORIGIN_LEFT_TOP
+    y1 = frameBuffer->height - y1 - 1;
+    y2 = frameBuffer->height - y2 - 1;
     #endif
 
-    render_screenspace_line_colored(x1, y1, x2, y2);
+    _render_screenspace_line_colored(x1, y1, x2, y2);
 }
 
-R8void r8RenderLines(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer)
+void r8_render_lines(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer)
 {
-    // TODO: To be implemented yet
+    //...
 }
 
-R8void r8RenderLinesIndexed(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer, const R8IndexBuffer* indexbuffer)
+void r8_render_line_strip(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer)
 {
-    if (R8_STATE_MACHINE.framebuffer == NULL)
+    //...
+}
+
+void r8_render_line_loop(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer)
+{
+    //...
+}
+
+void r8_render_indexed_lines(R8sizei numVertices, R8sizei firstVertex, /*const */R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
+{
+    if (R8_STATE_MACHINE.boundFrameBuffer == NULL)
     {
         R8_ERROR(R8_ERROR_INVALID_STATE);
         return;
     }
-    if (vertexbuffer == NULL || indexbuffer == NULL)
+    if (vertexBuffer == NULL || indexBuffer == NULL)
     {
         R8_ERROR(R8_ERROR_NULL_POINTER);
         return;
     }
-    if (firstVertex + numVertices > indexbuffer->numIndices)
+    if (firstVertex + numVertices > indexBuffer->numIndices)
     {
         R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
         return;
     }
 
-    transform_all_vertexbuffer(vertexbuffer);
+    _vertexbuffer_transform_all(vertexBuffer);
 
-    if (R8_STATE_MACHINE.texture != NULL)
-        render_indexed_linex_textured(R8_STATE_MACHINE.texture, numVertices, firstVertex, vertexbuffer, indexbuffer);
+    if (R8_STATE_MACHINE.boundTexture != NULL)
+        _render_indexed_lines_textured(R8_STATE_MACHINE.boundTexture, numVertices, firstVertex, vertexBuffer, indexBuffer);
     else
-        render_indexed_lines_colored(numVertices, firstVertex, vertexbuffer, indexbuffer);
+        _render_indexed_lines_colored(numVertices, firstVertex, vertexBuffer, indexBuffer);
 }
 
-/********** Images **********/
-
-static R8void render_screenspace_image_textured(const R8Texture* texture, R8int left, R8int top, R8int right, R8int bottom)
+void r8_render_indexed_line_strip(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
 {
-    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+    //...
+}
+
+void r8_render_indexed_line_loop(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
+{
+    //...
+}
+
+// --- images --- //
+
+static void _render_screenspace_image_textured(const R8Texture* texture, R8int left, R8int top, R8int right, R8int bottom)
+{
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.boundFrameBuffer;
 
     // Clamp rectangle
-    left    = R8_CLAMP(left,    0, (R8int)frameBuffer->width - 1);
-    top     = R8_CLAMP(top,     0, (R8int)frameBuffer->height - 1);
-    right   = R8_CLAMP(right,   0, (R8int)frameBuffer->width - 1);
-    bottom  = R8_CLAMP(bottom,  0, (R8int)frameBuffer->height - 1);
+    left    = R8_CLAMP(left, 0, (R8int)frameBuffer->width - 1);
+    top     = R8_CLAMP(top, 0, (R8int)frameBuffer->height - 1);
+    right   = R8_CLAMP(right, 0, (R8int)frameBuffer->width - 1);
+    bottom  = R8_CLAMP(bottom, 0, (R8int)frameBuffer->height - 1);
 
     // Flip vertical
-    #ifdef R8_ORIGIN_TOP_LEFT
-        top = frameBuffer->height - top - 1;
-        bottom = frameBuffer->height - bottom - 1;
+    #ifdef R8_ORIGIN_LEFT_TOP
+    top = frameBuffer->height - top - 1;
+    bottom = frameBuffer->height - bottom - 1;
     #endif
 
     if (top > bottom)
@@ -454,9 +496,9 @@ static R8void render_screenspace_image_textured(const R8Texture* texture, R8int 
         R8_SWAP(R8int, left, right);
 
     // Select MIP level
-    R8texturesize width = 0, height = 0;
-    R8ubyte mipLevel = 0;//r8TextureComputeMipMapLevel(texture, 1.0f / (R8float)(right - left), 0.0f, 0.0f, 1.0f / (R8float)(bottom - top));
-    const R8ColorBuffer* texels = r8TextureSelectMipmapLevel(texture, mipLevel, &width, &height);
+    R8texsize width = 0, height = 0;
+    R8ubyte mipLevel = 0;//_r8_texture_compute_miplevel(texture, 1.0f / (R8float)(right - left), 0.0f, 0.0f, 1.0f / (R8float)(bottom - top));
+    const R8ColorBuffer* texels = r8_texture_select_miplevel(texture, mipLevel, &width, &height);
 
     // Rasterize rectangle
     R8Pixel* pixels = frameBuffer->pixels;
@@ -464,10 +506,10 @@ static R8void render_screenspace_image_textured(const R8Texture* texture, R8int 
     R8Pixel* scanline;
 
     R8float u = 0.0f;
-    #ifdef R8_ORIGIN_TOP_LEFT
-        R8float v = 1.0f;
+    #ifdef R8_ORIGIN_LEFT_TOP
+    R8float v = 1.0f;
     #else
-        R8float v = 0.0f;
+    R8float v = 0.0f;
     #endif
 
     const R8float uStep = 1.0f / ((R8float)(right - left));
@@ -481,24 +523,29 @@ static R8void render_screenspace_image_textured(const R8Texture* texture, R8int 
 
         for (R8int x = left; x <= right; ++x)
         {
-            R8ColorBuffer color = r8TextureSampleFromNearestMipmap(texels, width, height, u, v);
+            R8ColorBuffer color = r8_texture_sample_nearest_from_mipmap(texels, width, height, u, v);
 
-        #ifdef R8_BLACK_TO_TRANSPARENCY
+            #ifdef R8_BLACK_IS_ALPHA
+            #   ifdef R8_COLOR_BUFFER_24BIT
+            if (color.r != 0 || color.g != 0 || color.b != 0)
+            {
+            #   else
             if (color != 0)
             {
-        #endif
+            #   endif
+            #endif
 
-                scanline->colorBuffer = color;
+            scanline->colorIndex = color;
 
-        #ifdef R8_BLACK_TO_TRANSPARENCY
+            #ifdef R8_BLACK_IS_ALPHA
             }
-        #endif
+            #endif
 
             ++scanline;
             u += uStep;
         }
 
-        #ifdef R8_ORIGIN_TOP_LEFT
+        #ifdef R8_ORIGIN_LEFT_TOP
         v -= vStep;
         #else
         v += vStep;
@@ -506,18 +553,18 @@ static R8void render_screenspace_image_textured(const R8Texture* texture, R8int 
     }
 }
 
-static R8void render_screenspace_image_colored(R8ColorBuffer colorBuffer, R8int left, R8int top, R8int right, R8int bottom)
+static void _render_screenspace_image_colored(R8ColorBuffer colorIndex, R8int left, R8int top, R8int right, R8int bottom)
 {
-    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.boundFrameBuffer;
 
     // Clamp rectangle
-    left    = R8_CLAMP(left,    0, (R8int)frameBuffer->width - 1);
-    top     = R8_CLAMP(top,     0, (R8int)frameBuffer->height - 1);
-    right   = R8_CLAMP(right,   0, (R8int)frameBuffer->width - 1);
-    bottom  = R8_CLAMP(bottom,  0, (R8int)frameBuffer->height - 1);
+    left    = R8_CLAMP(left, 0, (R8int)frameBuffer->width - 1);
+    top     = R8_CLAMP(top, 0, (R8int)frameBuffer->height - 1);
+    right   = R8_CLAMP(right, 0, (R8int)frameBuffer->width - 1);
+    bottom  = R8_CLAMP(bottom, 0, (R8int)frameBuffer->height - 1);
 
     // Flip vertical
-    #ifdef R8_ORIGIN_TOP_LEFT
+    #ifdef R8_ORIGIN_LEFT_TOP
     top = frameBuffer->height - top - 1;
     bottom = frameBuffer->height - bottom - 1;
     #endif
@@ -537,30 +584,29 @@ static R8void render_screenspace_image_colored(R8ColorBuffer colorBuffer, R8int 
         scanline = pixels + (y * pitch + left);
         for (R8int x = left; x <= right; ++x)
         {
-            scanline->colorBuffer = colorBuffer;
+            scanline->colorIndex = colorIndex;
             ++scanline;
         }
     }
 }
 
-R8void r8RenderScreenSpaceImage(R8int left, R8int top, R8int right, R8int bottom)
+void r8_render_screenspace_image(R8int left, R8int top, R8int right, R8int bottom)
 {
-    if (R8_STATE_MACHINE.framebuffer != NULL)
+    if (R8_STATE_MACHINE.boundFrameBuffer != NULL)
     {
-        if (R8_STATE_MACHINE.texture != NULL)
-            render_screenspace_image_textured(R8_STATE_MACHINE.texture, left, top, right, bottom);
+        if (R8_STATE_MACHINE.boundTexture != NULL)
+            _render_screenspace_image_textured(R8_STATE_MACHINE.boundTexture, left, top, right, bottom);
         else
-            render_screenspace_image_colored(R8_STATE_MACHINE.color0, left, top, right, bottom);
+            _render_screenspace_image_colored(R8_STATE_MACHINE.color0, left, top, right, bottom);
     }
     else
         R8_ERROR(R8_ERROR_INVALID_STATE);
 }
 
-/********** Triangles **********/
+// --- triangles --- //
 
-// Calculate the vertex 'c' which is clipped between the vertices 'a' and 'b' and the plane 'z'
-
-static R8ClipVertex get_z_plane_vertex(R8ClipVertex a, R8ClipVertex b, R8float z)
+// Computes the vertex 'c' which is cliped between the vertices 'a' and 'b' and the plane 'z'
+static R8ClipVertex _get_zplane_vertex(R8ClipVertex a, R8ClipVertex b, R8float z)
 {
     R8interp m = ((R8interp)(z - b.z)) / (a.z - b.z);
     R8ClipVertex c;
@@ -577,55 +623,55 @@ static R8ClipVertex get_z_plane_vertex(R8ClipVertex a, R8ClipVertex b, R8float z
 }
 
 // Clips the polygon at the z planes
-static R8void polygon_z_clipping(R8float zMin, R8float zMax)
+static void _polygon_z_clipping(R8float zMin, R8float zMax)
 {
     R8int x, y;
 
     // Clip at near clipping plane (zMin)
     R8int localNumVerts = 0;
 
-    for (x = numPolyVertices_ - 1, y = 0; y < numPolyVertices_; x = y, ++y)
+    for (x = _numPolyVerts - 1, y = 0; y < _numPolyVerts; x = y, ++y)
     {
         // Inside
-        if (clipVertices_[x].z >= zMin && clipVertices_[y].z >= zMin)
-            clipVerticesTemp_[localNumVerts++] = clipVertices_[y];
+        if (_clipVertices[x].z >= zMin && _clipVertices[y].z >= zMin)
+            _clipVerticesTmp[localNumVerts++] = _clipVertices[y];
 
         // Leaving
-        if (clipVertices_[x].z >= zMin && clipVertices_[y].z < zMin)
-            clipVerticesTemp_[localNumVerts++] = get_z_plane_vertex(clipVertices_[x], clipVertices_[y], zMin);
+        if (_clipVertices[x].z >= zMin && _clipVertices[y].z < zMin)
+            _clipVerticesTmp[localNumVerts++] = _get_zplane_vertex(_clipVertices[x], _clipVertices[y], zMin);
 
         // Entering
-        if (clipVertices_[x].z < zMin && clipVertices_[y].z >= zMin)
+        if (_clipVertices[x].z < zMin && _clipVertices[y].z >= zMin)
         {
-            clipVerticesTemp_[localNumVerts++] = get_z_plane_vertex(clipVertices_[x], clipVertices_[y], zMin);
-            clipVerticesTemp_[localNumVerts++] = clipVertices_[y];
+            _clipVerticesTmp[localNumVerts++] = _get_zplane_vertex(_clipVertices[x], _clipVertices[y], zMin);
+            _clipVerticesTmp[localNumVerts++] = _clipVertices[y];
         }
     }
 
     // Clip at far clipping plane (zMax)
-    numPolyVertices_ = 0;
+    _numPolyVerts = 0;
 
     for (x = localNumVerts - 1, y = 0; y < localNumVerts; x = y, ++y)
     {
         // Inside
-        if (clipVerticesTemp_[x].z <= zMax && clipVerticesTemp_[y].z <= zMax)
-            clipVertices_[numPolyVertices_++] = clipVerticesTemp_[y];
+        if (_clipVerticesTmp[x].z <= zMax && _clipVerticesTmp[y].z <= zMax)
+            _clipVertices[_numPolyVerts++] = _clipVerticesTmp[y];
 
         // Leaving
-        if (clipVerticesTemp_[x].z <= zMax && clipVerticesTemp_[y].z > zMax)
-            clipVertices_[numPolyVertices_++] = get_z_plane_vertex(clipVerticesTemp_[x], clipVerticesTemp_[y], zMax);
+        if (_clipVerticesTmp[x].z <= zMax && _clipVerticesTmp[y].z > zMax)
+            _clipVertices[_numPolyVerts++] = _get_zplane_vertex(_clipVerticesTmp[x], _clipVerticesTmp[y], zMax);
 
         // Entering
-        if (clipVerticesTemp_[x].z > zMax && clipVerticesTemp_[y].z <= zMax)
+        if (_clipVerticesTmp[x].z > zMax && _clipVerticesTmp[y].z <= zMax)
         {
-            clipVertices_[numPolyVertices_++] = get_z_plane_vertex(clipVerticesTemp_[x], clipVerticesTemp_[y], zMax);
-            clipVertices_[numPolyVertices_++] = clipVerticesTemp_[y];
+            _clipVertices[_numPolyVerts++] = _get_zplane_vertex(_clipVerticesTmp[x], _clipVerticesTmp[y], zMax);
+            _clipVertices[_numPolyVerts++] = _clipVerticesTmp[y];
         }
     }
 }
 
-// Computes the vertex 'c' which is clipped between the vertices 'a' and 'b' and the plane 'x'
-static R8RasterVertex get_xplane_vertex(R8RasterVertex a, R8RasterVertex b, R8int x)
+// Computes the vertex 'c' which is cliped between the vertices 'a' and 'b' and the plane 'x'
+static R8RasterVertex _get_xplane_vertex(R8RasterVertex a, R8RasterVertex b, R8int x)
 {
     R8interp m = ((R8interp)(x - b.x)) / (a.x - b.x);
     R8RasterVertex c;
@@ -640,8 +686,8 @@ static R8RasterVertex get_xplane_vertex(R8RasterVertex a, R8RasterVertex b, R8in
     return c;
 }
 
-// Computes the vertex 'c' which is clipped between the vertices 'a' and 'b' and the plane 'y'
-static R8RasterVertex get_yplane_vertex(R8RasterVertex a, R8RasterVertex b, R8int y)
+// Computes the vertex 'c' which is cliped between the vertices 'a' and 'b' and the plane 'y'
+static R8RasterVertex _get_yplane_vertex(R8RasterVertex a, R8RasterVertex b, R8int y)
 {
     R8interp m = ((R8interp)(y - b.y)) / (a.y - b.y);
     R8RasterVertex c;
@@ -657,103 +703,103 @@ static R8RasterVertex get_yplane_vertex(R8RasterVertex a, R8RasterVertex b, R8in
 }
 
 // Clips the polygon at the x and y planes
-static R8void polygon_xy_clipping(R8int xMin, R8int xMax, R8int yMin, R8int yMax)
+static void _polygon_xy_clipping(R8int xMin, R8int xMax, R8int yMin, R8int yMax)
 {
     R8int x, y;
 
     // Clip at left clipping plane (xMin)
     R8int localNumVerts = 0;
 
-    for (x = numPolyVertices_ - 1, y = 0; y < numPolyVertices_; x = y, ++y)
+    for (x = _numPolyVerts - 1, y = 0; y < _numPolyVerts; x = y, ++y)
     {
         // Inside
-        if (rasterVertices_[x].x >= xMin && rasterVertices_[y].x >= xMin)
-            rasterVerticesTemp_[localNumVerts++] = rasterVertices_[y];
+        if (_rasterVertices[x].x >= xMin && _rasterVertices[y].x >= xMin)
+            _rasterVerticesTmp[localNumVerts++] = _rasterVertices[y];
 
         // Leaving
-        if (rasterVertices_[x].x >= xMin && rasterVertices_[y].x < xMin)
-            rasterVerticesTemp_[localNumVerts++] = get_xplane_vertex(rasterVertices_[x], rasterVertices_[y], xMin);
+        if (_rasterVertices[x].x >= xMin && _rasterVertices[y].x < xMin)
+            _rasterVerticesTmp[localNumVerts++] = _get_xplane_vertex(_rasterVertices[x], _rasterVertices[y], xMin);
 
         // Entering
-        if (rasterVertices_[x].x < xMin && rasterVertices_[y].x >= xMin)
+        if (_rasterVertices[x].x < xMin && _rasterVertices[y].x >= xMin)
         {
-            rasterVerticesTemp_[localNumVerts++] = get_xplane_vertex(rasterVertices_[x], rasterVertices_[y], xMin);
-            rasterVerticesTemp_[localNumVerts++] = rasterVertices_[y];
+            _rasterVerticesTmp[localNumVerts++] = _get_xplane_vertex(_rasterVertices[x], _rasterVertices[y], xMin);
+            _rasterVerticesTmp[localNumVerts++] = _rasterVertices[y];
         }
     }
 
     // Clip at right clipping plane (xMax)
-    numPolyVertices_ = 0;
+    _numPolyVerts = 0;
 
     for (x = localNumVerts - 1, y = 0; y < localNumVerts; x = y, ++y)
     {
         // Inside
-        if (rasterVerticesTemp_[x].x <= xMax && rasterVerticesTemp_[y].x <= xMax)
-            rasterVertices_[numPolyVertices_++] = rasterVerticesTemp_[y];
+        if (_rasterVerticesTmp[x].x <= xMax && _rasterVerticesTmp[y].x <= xMax)
+            _rasterVertices[_numPolyVerts++] = _rasterVerticesTmp[y];
 
         // Leaving
-        if (rasterVerticesTemp_[x].x <= xMax && rasterVerticesTemp_[y].x > xMax)
-            rasterVertices_[numPolyVertices_++] = get_xplane_vertex(rasterVerticesTemp_[x], rasterVerticesTemp_[y], xMax);
+        if (_rasterVerticesTmp[x].x <= xMax && _rasterVerticesTmp[y].x > xMax)
+            _rasterVertices[_numPolyVerts++] = _get_xplane_vertex(_rasterVerticesTmp[x], _rasterVerticesTmp[y], xMax);
 
         // Entering
-        if (rasterVerticesTemp_[x].x > xMax && rasterVerticesTemp_[y].x <= xMax)
+        if (_rasterVerticesTmp[x].x > xMax && _rasterVerticesTmp[y].x <= xMax)
         {
-            rasterVertices_[numPolyVertices_++] = get_xplane_vertex(rasterVerticesTemp_[x], rasterVerticesTemp_[y], xMax);
-            rasterVertices_[numPolyVertices_++] = rasterVerticesTemp_[y];
+            _rasterVertices[_numPolyVerts++] = _get_xplane_vertex(_rasterVerticesTmp[x], _rasterVerticesTmp[y], xMax);
+            _rasterVertices[_numPolyVerts++] = _rasterVerticesTmp[y];
         }
     }
 
     // Clip at top clipping plane (yMin)
     localNumVerts = 0;
 
-    for (x = numPolyVertices_ - 1, y = 0; y < numPolyVertices_; x = y, ++y)
+    for (x = _numPolyVerts - 1, y = 0; y < _numPolyVerts; x = y, ++y)
     {
         // Inside
-        if (rasterVertices_[x].y >= yMin && rasterVertices_[y].y >= yMin)
-            rasterVerticesTemp_[localNumVerts++] = rasterVertices_[y];
+        if (_rasterVertices[x].y >= yMin && _rasterVertices[y].y >= yMin)
+            _rasterVerticesTmp[localNumVerts++] = _rasterVertices[y];
 
         // Leaving
-        if (rasterVertices_[x].y >= yMin && rasterVertices_[y].y < yMin)
-            rasterVerticesTemp_[localNumVerts++] = get_yplane_vertex(rasterVertices_[x], rasterVertices_[y], yMin);
+        if (_rasterVertices[x].y >= yMin && _rasterVertices[y].y < yMin)
+            _rasterVerticesTmp[localNumVerts++] = _get_yplane_vertex(_rasterVertices[x], _rasterVertices[y], yMin);
 
         // Entering
-        if (rasterVertices_[x].y < yMin && rasterVertices_[y].y >= yMin)
+        if (_rasterVertices[x].y < yMin && _rasterVertices[y].y >= yMin)
         {
-            rasterVerticesTemp_[localNumVerts++] = get_yplane_vertex(rasterVertices_[x], rasterVertices_[y], yMin);
-            rasterVerticesTemp_[localNumVerts++] = rasterVertices_[y];
+            _rasterVerticesTmp[localNumVerts++] = _get_yplane_vertex(_rasterVertices[x], _rasterVertices[y], yMin);
+            _rasterVerticesTmp[localNumVerts++] = _rasterVertices[y];
         }
     }
 
     // Clip at bottom clipping plane (yMax)
-    numPolyVertices_ = 0;
+    _numPolyVerts = 0;
 
     for (x = localNumVerts - 1, y = 0; y < localNumVerts; x = y, ++y)
     {
         // Inside
-        if (rasterVerticesTemp_[x].y <= yMax && rasterVerticesTemp_[y].y <= yMax)
-            rasterVertices_[numPolyVertices_++] = rasterVerticesTemp_[y];
+        if (_rasterVerticesTmp[x].y <= yMax && _rasterVerticesTmp[y].y <= yMax)
+            _rasterVertices[_numPolyVerts++] = _rasterVerticesTmp[y];
 
         // Leaving
-        if (rasterVerticesTemp_[x].y <= yMax && rasterVerticesTemp_[y].y > yMax)
-            rasterVertices_[numPolyVertices_++] = get_yplane_vertex(rasterVerticesTemp_[x], rasterVerticesTemp_[y], yMax);
+        if (_rasterVerticesTmp[x].y <= yMax && _rasterVerticesTmp[y].y > yMax)
+            _rasterVertices[_numPolyVerts++] = _get_yplane_vertex(_rasterVerticesTmp[x], _rasterVerticesTmp[y], yMax);
 
         // Entering
-        if (rasterVerticesTemp_[x].y > yMax && rasterVerticesTemp_[y].y <= yMax)
+        if (_rasterVerticesTmp[x].y > yMax && _rasterVerticesTmp[y].y <= yMax)
         {
-            rasterVertices_[numPolyVertices_++] = get_yplane_vertex(rasterVerticesTemp_[x], rasterVerticesTemp_[y], yMax);
-            rasterVertices_[numPolyVertices_++] = rasterVerticesTemp_[y];
+            _rasterVertices[_numPolyVerts++] = _get_yplane_vertex(_rasterVerticesTmp[x], _rasterVerticesTmp[y], yMax);
+            _rasterVertices[_numPolyVerts++] = _rasterVerticesTmp[y];
         }
     }
 }
 
-static R8void index_inc(R8int* x, R8int numVertices)
+static void _index_inc(R8int* x, R8int numVertices)
 {
     ++(*x);
     if (*x >= numVertices)
         *x = 0;
 }
 
-static R8void index_dec(R8int* x, R8int numVertices)
+static void _index_dec(R8int* x, R8int numVertices)
 {
     --(*x);
     if (*x < 0)
@@ -761,39 +807,39 @@ static R8void index_dec(R8int* x, R8int numVertices)
 }
 
 // Rasterizes convex polygon filled
-static R8void rasterize_polygon_fill(R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
+static void _rasterize_polygon_fill(R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
 {
     // Select MIP level
-    R8texturesize mipWidth = 0, mipHeight = 0;
-    const R8ColorBuffer* texels = r8TextureSelectMipmapLevel(texture, mipLevel, &mipWidth, &mipHeight);
+    R8texsize mipWidth = 0, mipHeight = 0;
+    const R8ColorBuffer* texels = r8_texture_select_miplevel(texture, mipLevel, &mipWidth, &mipHeight);
 
     // Find left- and right sided polygon edges
     R8int x, y, top = 0, bottom = 0;
 
-    for (x = 1; x < numPolyVertices_; ++x)
+    for (x = 1; x < _numPolyVerts; ++x)
     {
-        if (rasterVertices_[top].y > rasterVertices_[x].y)
+        if (_rasterVertices[top].y > _rasterVertices[x].y)
             top = x;
-        if (rasterVertices_[bottom].y < rasterVertices_[x].y)
+        if (_rasterVertices[bottom].y < _rasterVertices[x].y)
             bottom = x;
     }
 
     // Setup raster scanline sides
-    R8SideScanline* leftSide = frameBuffer->scanlinesStart;
-    R8SideScanline* rightSide = frameBuffer->scanlinesEnd;
+    R8ScalineSide* leftSide = frameBuffer->scanlinesStart;
+    R8ScalineSide* rightSide = frameBuffer->scanlinesEnd;
 
     x = y = top;
-    for (index_dec(&y, numPolyVertices_); x != bottom; x = y, index_dec(&y, numPolyVertices_))
-        r8FrameBufferSetupScanlines(frameBuffer, leftSide, rasterVertices_[x], rasterVertices_[y]);
+    for (_index_dec(&y, _numPolyVerts); x != bottom; x = y, _index_dec(&y, _numPolyVerts))
+        r8_framebuffer_setup_scanlines(frameBuffer, leftSide, _rasterVertices[x], _rasterVertices[y]);
 
     x = y = top;
-    for (index_inc(&y, numPolyVertices_); x != bottom; x = y, index_inc(&y, numPolyVertices_))
-        r8FrameBufferSetupScanlines(frameBuffer, rightSide, rasterVertices_[x], rasterVertices_[y]);
+    for (_index_inc(&y, _numPolyVerts); x != bottom; x = y, _index_inc(&y, _numPolyVerts))
+        r8_framebuffer_setup_scanlines(frameBuffer, rightSide, _rasterVertices[x], _rasterVertices[y]);
 
-    // Check if sides must be swapped
-    long midIndex = (rasterVertices_[bottom].y + rasterVertices_[top].y) / 2;
-    if (frameBuffer->scanlinesStart[midIndex].pixelOffset > frameBuffer->scanlinesEnd[midIndex].pixelOffset)
-        R8_SWAP(R8SideScanline*, leftSide, rightSide);
+    // Check if sides must be swaped
+    long midIndex = (_rasterVertices[bottom].y + _rasterVertices[top].y) / 2;
+    if (frameBuffer->scanlinesStart[midIndex].offset > frameBuffer->scanlinesEnd[midIndex].offset)
+        R8_SWAP(R8ScalineSide*, leftSide, rightSide);
 
     // Start rasterizing the polygon
     R8int len, offset;
@@ -801,15 +847,15 @@ static R8void rasterize_polygon_fill(R8FrameBuffer* frameBuffer, const R8Texture
     R8interp u, uAct, uStep;
     R8interp v, vAct, vStep;
 
-    R8int yStart = rasterVertices_[top].y;
-    R8int yEnd = rasterVertices_[bottom].y;
+    R8int yStart = _rasterVertices[top].y;
+    R8int yEnd = _rasterVertices[bottom].y;
 
     R8Pixel* pixel;
 
     // Rasterize each scanline
     for (y = yStart; y <= yEnd; ++y)
     {
-        len = rightSide[y].pixelOffset - leftSide[y].pixelOffset;
+        len = rightSide[y].offset - leftSide[y].offset;
         if (len <= 0)
             continue;
 
@@ -817,7 +863,7 @@ static R8void rasterize_polygon_fill(R8FrameBuffer* frameBuffer, const R8Texture
         uStep = (rightSide[y].u - leftSide[y].u) / len;
         vStep = (rightSide[y].v - leftSide[y].v) / len;
 
-        offset = leftSide[y].pixelOffset;
+        offset = leftSide[y].offset;
         zAct = leftSide[y].z;
         uAct = leftSide[y].u;
         vAct = leftSide[y].v;
@@ -829,13 +875,13 @@ static R8void rasterize_polygon_fill(R8FrameBuffer* frameBuffer, const R8Texture
             pixel = &(frameBuffer->pixels[offset]);
 
             // Make depth test
-            R8DepthBuffer depth = r8WriteRealDepthToBuffer(zAct);
+            R8DepthBuffer depth = r8_pixel_write_depth(zAct);
 
-            if (depth > pixel->depthBuffer)
+            if (depth > pixel->depth)
             {
-                pixel->depthBuffer = depth;
+                pixel->depth = depth;
 
-                #ifdef R8_PERSPECTIVE_DEPTH_CORRECTED
+                #ifdef R8_PERSPECTIVE_CORRECTED
                 // Compute perspective corrected texture coordinates
                 z = R8_FLOAT(1.0) / zAct;
                 u = uAct * z;
@@ -847,7 +893,9 @@ static R8void rasterize_polygon_fill(R8FrameBuffer* frameBuffer, const R8Texture
                 #endif
 
                 // Sample texture
-                pixel->colorBuffer = r8TextureSampleFromNearestMipmap(texels, mipWidth, mipHeight, (R8float)u, (R8float)v);
+                pixel->colorIndex = r8_texture_sample_nearest_from_mipmap(texels, mipWidth, mipHeight, (R8float)u, (R8float)v);
+                //pixel->colorIndex = _r8_texture_sample_nearest(texture, u, v, uStep*z, vStep*z);
+                //pixel->colorIndex = (R8ubyte)(zAct * (R8float)UCHAR_MAX);
             }
 
             // Next pixel
@@ -857,113 +905,111 @@ static R8void rasterize_polygon_fill(R8FrameBuffer* frameBuffer, const R8Texture
             vAct += vStep;
         }
     }
-
 }
 
 // Rasterizes convex polygon outlines
-static R8void rasterize_polygon_line(R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
+static void _rasterize_polygon_line(R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
 {
-    for (R8int i = 0; i + 1 < numPolyVertices_; ++i)
-        rasterize_line(frameBuffer, texture, mipLevel, i, i + 1);
-
-    rasterize_line(frameBuffer, texture, mipLevel, numPolyVertices_ - 1, 0);
+    for (R8int i = 0; i + 1 < _numPolyVerts; ++i)
+        _rasterize_line(frameBuffer, texture, mipLevel, i, i + 1);
+    _rasterize_line(frameBuffer, texture, mipLevel, _numPolyVerts - 1, 0);
 }
 
 // Rasterizes convex polygon points
-static R8void rasterize_polygon_point(
+static void _rasterize_polygon_point(
     R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
 {
-    for (R8int i = 0; i < numPolyVertices_; ++i)
+    for (R8int i = 0; i < _numPolyVerts; ++i)
     {
-        r8FrameBufferPlot(
+        r8_framebuffer_plot(
             frameBuffer,
-            rasterVertices_[i].x,
-            rasterVertices_[i].y,
+            _rasterVertices[i].x,
+            _rasterVertices[i].y,
             R8_STATE_MACHINE.color0
         );
     }
 }
 
-static R8void rasterize_polygon(R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
+static void _rasterize_polygon(R8FrameBuffer* frameBuffer, const R8Texture* texture, R8ubyte mipLevel)
 {
     // Rasterize polygon with selected MIP level
     switch (R8_STATE_MACHINE.polygonMode)
     {
-    case R8_POLYGON_FILL:
-        rasterize_polygon_fill(frameBuffer, texture, mipLevel);
-        break;
-    case R8_POLYGON_LINE:
-        rasterize_polygon_line(frameBuffer, texture, mipLevel);
-        break;
-    case R8_POLYGON_POINT:
-        rasterize_polygon_point(frameBuffer, texture, mipLevel);
-        break;
+        case R8_POLYGON_FILL:
+            _rasterize_polygon_fill(frameBuffer, texture, mipLevel);
+            break;
+        case R8_POLYGON_LINE:
+            _rasterize_polygon_line(frameBuffer, texture, mipLevel);
+            break;
+        case R8_POLYGON_POINT:
+            _rasterize_polygon_point(frameBuffer, texture, mipLevel);
+            break;
     }
 }
 
-static R8bool clip_and_project_polygon(R8int numVertices)
+static R8boolean _clip_and_r8oject_polygon(R8int numVertices)
 {
     // Get clipping rectangle
-    const R8int xMin = R8_STATE_MACHINE.clipQuad.left;
-    const R8int xMax = R8_STATE_MACHINE.clipQuad.right;
-    const R8int yMin = R8_STATE_MACHINE.clipQuad.top;
-    const R8int yMax = R8_STATE_MACHINE.clipQuad.bottom;
+    const R8int xMin = R8_STATE_MACHINE.clipRect.left;
+    const R8int xMax = R8_STATE_MACHINE.clipRect.right;
+    const R8int yMin = R8_STATE_MACHINE.clipRect.top;
+    const R8int yMax = R8_STATE_MACHINE.clipRect.bottom;
 
     // Z clipping
-    numPolyVertices_ = numVertices;
-    polygon_z_clipping(1.0f, 100.0f);//!!!
+    _numPolyVerts = numVertices;
+    _polygon_z_clipping(1.0f, 100.0f);//!!!
     //_polygon_z_clipping(0.01f, 100.0f);//!!!
 
-    if (numPolyVertices_ < 3)
+    if (_numPolyVerts < 3)
         return R8_FALSE;
 
     // Projection
-    for (R8int j = 0; j < numPolyVertices_; ++j)
-        project_vertex(&(clipVertices_[j]), &(R8_STATE_MACHINE.viewport));
+    for (R8int j = 0; j < _numPolyVerts; ++j)
+        _r8oject_vertex(&(_clipVertices[j]), &(R8_STATE_MACHINE.viewport));
 
     // Make culling test
-    if (is_triangle_culled(R8_CLIP_VERT_VEC2(0), R8_CLIP_VERT_VEC2(1), R8_CLIP_VERT_VEC2(2)))
+    if (_is_triangle_culled(_CVERT_VEC2(0), _CVERT_VEC2(1), _CVERT_VEC2(2)))
         return R8_FALSE;
 
     // Setup raster vertices
-    for (R8int j = 0; j < numPolyVertices_; ++j)
-        setup_raster_vertex(&(rasterVertices_[j]), &(clipVertices_[j]));
+    for (R8int j = 0; j < _numPolyVerts; ++j)
+        _setup_raster_vertex(&(_rasterVertices[j]), &(_clipVertices[j]));
 
     // Edge clipping
-    polygon_xy_clipping(xMin, xMax, yMin, yMax);
+    _polygon_xy_clipping(xMin, xMax, yMin, yMax);
 
-    if (numPolyVertices_ < 3)
+    if (_numPolyVerts < 3)
         return R8_FALSE;
 
     return R8_TRUE;
 }
 
-static R8ubyte compute_polygon_miplevel(const R8Texture* texture)
+static R8ubyte _compute_polygon_miplevel(const R8Texture* texture)
 {
-    if (R8_STATE_MACHINE.states[R8_MIPMAP_MODE] != R8_FALSE && texture->mips > 0)
+    if (R8_STATE_MACHINE.states[R8_MIP_MAPPING] != R8_FALSE && texture->mips > 0)
     {
         // Find closest vertex
-        R8interp zMin = rasterVertices_[0].z;
-        for (R8int i = 1; i < numPolyVertices_; ++i)
+        R8interp zMin = _rasterVertices[0].z;
+        for (R8int i = 1; i < _numPolyVerts; ++i)
         {
-            if (zMin > rasterVertices_[i].z)
-                zMin = rasterVertices_[i].z;
+            if (zMin > _rasterVertices[i].z)
+                zMin = _rasterVertices[i].z;
         }
 
         // Derive mip level from z value
         zMin = 0.25f / zMin;
-        R8int zLog = r8ApproxIntLog2((R8float)zMin);
+        R8int zLog = r8_int_log2((R8float)zMin);
 
         return R8_CLAMP(zLog, 0, texture->mips - 1);
     }
     return 0;
 }
 
-static R8void render_triangles(
+static void _render_triangles(
     const R8Texture* texture, R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer)
 {
     // Get clipping dimensions
-    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.boundFrameBuffer;
 
     // Iterate over the index buffer
     for (R8sizei i = firstVertex, n = numVertices + firstVertex; i + 2 < n; i += 3)
@@ -974,58 +1020,61 @@ static R8void render_triangles(
         const R8Vertex* vertexC = (vertexBuffer->vertices + (i + 2));
 
         // Setup polygon
-        transform_vertex(&(clipVertices_[0]), vertexA);
-        transform_vertex(&(clipVertices_[1]), vertexB);
-        transform_vertex(&(clipVertices_[2]), vertexC);
+        _transform_vertex(&(_clipVertices[0]), vertexA);
+        _transform_vertex(&(_clipVertices[1]), vertexB);
+        _transform_vertex(&(_clipVertices[2]), vertexC);
 
-        if (clip_and_project_polygon(3) != R8_FALSE)
+        if (_clip_and_r8oject_polygon(3) != R8_FALSE)
         {
             // Rasterize active polygon
-            rasterize_polygon(frameBuffer, texture, compute_polygon_miplevel(texture));
+            _rasterize_polygon(frameBuffer, texture, _compute_polygon_miplevel(texture));
         }
     }
 }
 
-R8void r8RenderTriangles(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer)
+void r8_render_triangles(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer)
 {
-
-    if (R8_STATE_MACHINE.framebuffer == NULL)
+    if (R8_STATE_MACHINE.boundFrameBuffer == NULL)
     {
         R8_ERROR(R8_ERROR_INVALID_STATE);
         return;
     }
-    if (vertexbuffer == NULL)
+    if (vertexBuffer == NULL)
     {
         R8_ERROR(R8_ERROR_NULL_POINTER);
         return;
     }
-    if (firstVertex + numVertices > vertexbuffer->numVerts)
+    if (firstVertex + numVertices > vertexBuffer->numVertices)
     {
         R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
         return;
     }
 
-    R8Texture* texture = R8_STATE_MACHINE.framebuffer;
+    R8Texture* texture = R8_STATE_MACHINE.boundTexture;
     if (texture == NULL || texture->texels == NULL)
     {
-        r8TextureSingleColor(&R8_SINGLULAR_TEXTURE, R8_STATE_MACHINE.color0);
-        render_triangles(&R8_SINGLULAR_TEXTURE, numVertices, firstVertex, vertexbuffer);
+        r8_texture_singular_color(&R8_SINGULAR_TEXTURE, R8_STATE_MACHINE.color0);
+        _render_triangles(&R8_SINGULAR_TEXTURE, numVertices, firstVertex, vertexBuffer);
     }
     else
-        render_triangles(texture, numVertices, firstVertex, vertexbuffer);
+        _render_triangles(texture, numVertices, firstVertex, vertexBuffer);
 }
 
-
-R8void r8RenderTrianglesStrip(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer)
+void r8_render_triangle_strip(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer)
 {
-    // TODO: To be implemented
+    //...
 }
 
-static R8void render_indexed_triangles(
+void r8_render_triangle_fan(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer)
+{
+    //...
+}
+
+static void _render_indexed_triangles(
     const R8Texture* texture, R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
 {
     // Get clipping dimensions
-    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.framebuffer;
+    R8FrameBuffer* frameBuffer = R8_STATE_MACHINE.boundFrameBuffer;
 
     // Iterate over the index buffer
     for (R8sizei i = firstVertex, n = numVertices + firstVertex; i + 2 < n; i += 3)
@@ -1036,9 +1085,9 @@ static R8void render_indexed_triangles(
         R8ushort indexC = indexBuffer->indices[i + 2];
 
         #ifdef R8_DEBUG
-        if (indexA >= vertexBuffer->numVerts || indexB >= vertexBuffer->numVerts || indexC >= vertexBuffer->numVerts)
+        if (indexA >= vertexBuffer->numVertices || indexB >= vertexBuffer->numVertices || indexC >= vertexBuffer->numVertices)
         {
-            R8_SET_FATAL_ERROR("element in index buffer out of bounds");
+            R8_SET_ERROR_FATAL("element in index buffer out of bounds");
             return;
         }
         #endif
@@ -1049,50 +1098,52 @@ static R8void render_indexed_triangles(
         const R8Vertex* vertexC = (vertexBuffer->vertices + indexC);
 
         // Setup polygon
-        transform_vertex(&(clipVertices_[0]), vertexA);
-        transform_vertex(&(clipVertices_[1]), vertexB);
-        transform_vertex(&(clipVertices_[2]), vertexC);
+        _transform_vertex(&(_clipVertices[0]), vertexA);
+        _transform_vertex(&(_clipVertices[1]), vertexB);
+        _transform_vertex(&(_clipVertices[2]), vertexC);
 
-        if (clip_and_project_polygon(3) != R8_FALSE)
+        if (_clip_and_r8oject_polygon(3) != R8_FALSE)
         {
             // Rasterize active polygon
-            rasterize_polygon(frameBuffer, texture, compute_polygon_miplevel(texture));
+            _rasterize_polygon(frameBuffer, texture, _compute_polygon_miplevel(texture));
         }
     }
 }
 
-
-R8void r8RenderIndexedTriangles(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer, const R8IndexBuffer* indexbuffer)
+void r8_render_indexed_triangles(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
 {
-
-    if (R8_STATE_MACHINE.framebuffer == NULL)
+    if (R8_STATE_MACHINE.boundFrameBuffer == NULL)
     {
         R8_ERROR(R8_ERROR_INVALID_STATE);
         return;
     }
-    if (vertexbuffer == NULL || indexbuffer == NULL)
+    if (vertexBuffer == NULL || indexBuffer == NULL)
     {
         R8_ERROR(R8_ERROR_NULL_POINTER);
         return;
     }
-    if (firstVertex + numVertices > indexbuffer->numIndices)
+    if (firstVertex + numVertices > indexBuffer->numIndices)
     {
         R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
         return;
     }
 
-    if (R8_STATE_MACHINE.texture == NULL)
+    if (R8_STATE_MACHINE.boundTexture == NULL)
     {
-        r8TextureSingleColor(&R8_SINGLULAR_TEXTURE, R8_STATE_MACHINE.color0);
-        render_indexed_triangles(&R8_SINGLULAR_TEXTURE, numVertices, firstVertex, vertexbuffer, indexbuffer);
+        r8_texture_singular_color(&R8_SINGULAR_TEXTURE, R8_STATE_MACHINE.color0);
+        _render_indexed_triangles(&R8_SINGULAR_TEXTURE, numVertices, firstVertex, vertexBuffer, indexBuffer);
     }
     else
-        render_indexed_triangles(R8_STATE_MACHINE.texture, numVertices, firstVertex, vertexbuffer, indexbuffer);
+        _render_indexed_triangles(R8_STATE_MACHINE.boundTexture, numVertices, firstVertex, vertexBuffer, indexBuffer);
 }
 
-R8void r8RenderIndexedTrianglesStrip(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexbuffer, const R8IndexBuffer* indexbuffer)
+void r8_render_indexed_triangle_strip(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
 {
-    // TODO: To be Implemented
+    //...
 }
 
-/******************************************************************************/
+void r8_render_indexed_triangle_fan(R8sizei numVertices, R8sizei firstVertex, const R8VertexBuffer* vertexBuffer, const R8IndexBuffer* indexBuffer)
+{
+    //...
+}
+

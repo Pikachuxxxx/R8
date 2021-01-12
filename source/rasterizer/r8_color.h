@@ -1,38 +1,29 @@
-/* r8_color.h
+/*
+ * r8_color.h
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.
  */
 
-#ifndef R_8_COLOR_H
-#define R_8_COLOR_H
+#ifndef R8_COLOR_H
+#define R8_COLOR_H
 
-#include "r8_types.h"
+
 #include "r8_config.h"
 
-#ifdef R8_BGR_COLOR_FORMAT
 
-    typedef struct R8ColorBGR
-    {
-        R8ubyte b;
-        R8ubyte g;
-        R8ubyte r;
-    }R8ColorBGR;
+#ifdef R8_BGR_COLOR_OUTPUT
 
-    typedef R8ColorBGR R8Color;
+#include "r8_color_bgr.h"
+typedef R8ColorBGR R8Color;
 
 #else
 
-    typedef struct R8ColorRGB
-    {
-        R8ubyte r;
-        R8ubyte g;
-        R8ubyte b;
-    }R8ColorRGB;
-
-    typedef R8ColorRGB R8Color;
+#include "r8_color_rgb.h"
+typedef R8ColorRGB R8Color;
 
 #endif
+
 
 /****************************************************
  *                                                  *
@@ -47,5 +38,4 @@
  */
 typedef R8ubyte R8ColorBuffer;
 
-
-#endif 
+#endif

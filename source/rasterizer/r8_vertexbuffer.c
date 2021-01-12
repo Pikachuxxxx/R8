@@ -1,4 +1,5 @@
-/* r8_vertexbuffer.c
+/*
+ * r8_vertexbuffer.c
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.
@@ -7,169 +8,207 @@
 #include "r8_vertexbuffer.h"
 #include "r8_state_machine.h"
 #include "r8_error.h"
-#include "r8_config.h"
 #include "r8_memory.h"
+#include "r8_config.h"
 
-R8VertexBuffer* r8VertexBufferGenerate()
+#include <stdlib.h>
+
+
+R8VertexBuffer* r8_vertexbuffer_create()
 {
-    R8VertexBuffer* buffer = R8_MALLOC(R8VertexBuffer);
-    buffer->numVerts = 0;
-    buffer->vertices = NULL;
+    R8VertexBuffer* vertexBuffer = R8_MALLOC(R8VertexBuffer);
 
-    r8AddSMRef(buffer);
+    vertexBuffer->numVertices   = 0;
+    vertexBuffer->vertices      = NULL;
 
-    return buffer;
+    r8_ref_add(vertexBuffer);
+
+    return vertexBuffer;
 }
 
-R8void r8VertexBufferDelete(R8VertexBuffer* buffer)
+void r8_vertexbuffer_delete(R8VertexBuffer* vertexBuffer)
 {
-    if (buffer != NULL)
+    if (vertexBuffer != NULL)
     {
-        r8ReleaseSMRef(buffer);
+        r8_ref_release(vertexBuffer);
 
-        R8_FREE(buffer->vertices);
-        R8_FREE(buffer);
+        R8_FREE(vertexBuffer->vertices);
+        R8_FREE(vertexBuffer);
     }
 }
 
-R8void r8VertexBufferInit(R8VertexBuffer* buffer, R8sizei numVerts)
+void r8_vertexbuffer_singular_init(R8VertexBuffer* vertexBuffer, R8sizei numVertices)
 {
-    if (buffer != NULL)
+    if (vertexBuffer != NULL)
     {
-        buffer->numVerts = numVerts;
-        buffer->vertices = R8_CALLOC(R8Vertex, numVerts);
+        vertexBuffer->numVertices   = numVertices;
+        vertexBuffer->vertices      = R8_CALLOC(R8Vertex, numVertices);
     }
 }
 
-R8void r8VertexBufferClear(R8VertexBuffer* buffer)
+void r8_vertexbuffer_singular_clear(R8VertexBuffer* vertexBuffer)
 {
-    if (buffer != NULL)
-        R8_FREE(buffer->vertices);
+    if (vertexBuffer != NULL)
+        R8_FREE(vertexBuffer->vertices);
 }
 
-static R8void r8TransformVertex(R8Vertex* vertex, const R8Mat4* MVPMatrix, const R8Viewport* viewport)
+//!REMOVE THIS!
+static void _vertex_transform(
+    R8Vertex* vertex, const R8Matrix4* worldViewProjectionMatrix, const R8Viewport* viewport)
 {
-    // Transform view-space coordinate into projection space
-    r8Mat4MultiplyVector4(&(vertex->ndc.x), MVPMatrix, &(vertex->position.x));
+    // Transform view-space coordinate into r8ojection space
+    r8_matrix_mul_float4(&(vertex->ndc.x), worldViewProjectionMatrix, &(vertex->coord.x));
 
-    // Transform coordinates into NDC
-    vertex->ndc.z = 1.0f / vertex->ndc.x;
+    // Transform coordinate into normalized device coordinates
+    vertex->ndc.z = 1.0f / vertex->ndc.w;
     vertex->ndc.x *= vertex->ndc.z;
     vertex->ndc.y *= vertex->ndc.z;
 
     // Transform vertex to screen coordinate (+0.5 is for rounding adjustment)
     vertex->ndc.x = viewport->x + (vertex->ndc.x + 1.0f) * viewport->halfWidth + 0.5f;
     vertex->ndc.y = viewport->y + (vertex->ndc.y + 1.0f) * viewport->halfHeight + 0.5f;
+    //vertex->ndc.z = viewport->minDepth + vertex->ndc.z * viewport->depthSize;
 
-    #ifdef R8_PERSPECTIVE_DEPTH_CORRECTED
-        // Setup inverse-texture coordinates
-        vertex->invTexCoord.x = vertex->uv.x * vertex->ndc.z;
-        vertex->invTexCoord.y = vertex->uv.y * vertex->ndc.z;
+    #ifdef R8_PERSPECTIVE_CORRECTED
+    // Setup inverse-texture coordinates
+    vertex->invTexCoord.x = vertex->texCoord.x * vertex->ndc.z;
+    vertex->invTexCoord.y = vertex->texCoord.y * vertex->ndc.z;
     #endif
 }
 
-R8void r8VertexBufferTransformVertices(R8sizei numVerts, R8sizei firstVertex, R8VertexBuffer* vertexbuffer, const R8Mat4* MVPMatrix, const R8Viewport* viewport)
+void r8_vertexbuffer_transform(
+    R8sizei numVertices, R8sizei firstVertex, R8VertexBuffer* vertexBuffer,
+    const R8Matrix4* worldViewProjectionMatrix, const R8Viewport* viewport)
 {
-    const R8sizei lastVertex = numVerts + firstVertex;
+    const R8sizei lastVertex = numVertices + firstVertex;
 
-    if (lastVertex >= vertexbuffer->numVerts)
+    if (lastVertex >= vertexBuffer->numVertices)
     {
-        R8_ERROR(R8_ERROR_NULL_POINTER);
+        r8_error_set(R8_ERROR_INDEX_OUT_OF_BOUNDS, __FUNCTION__);
         return;
     }
 
     for (R8sizei i = firstVertex; i < lastVertex; ++i)
+        _vertex_transform((vertexBuffer->vertices + i), worldViewProjectionMatrix, viewport);
+}
+
+void r8_vertexbuffer_transform_all(
+    R8VertexBuffer* vertexBuffer, const R8Matrix4* worldViewProjectionMatrix, const R8Viewport* viewport)
+{
+    for (R8sizei i = 0; i < vertexBuffer->numVertices; ++i)
+        _vertex_transform((vertexBuffer->vertices + i), worldViewProjectionMatrix, viewport);
+}
+
+static void _vertexbuffer_resize(R8VertexBuffer* vertexBuffer, R8sizei numVertices)
+{
+    // Check if vertex buffer must be reallocated
+    if (vertexBuffer->vertices == NULL || vertexBuffer->numVertices != numVertices)
     {
-        r8TransformVertex((vertexbuffer->vertices + i), MVPMatrix, viewport);
+        // Create new vertex buffer data
+        R8_FREE(vertexBuffer->vertices);
+
+        vertexBuffer->numVertices   = numVertices;
+        vertexBuffer->vertices      = R8_CALLOC(R8Vertex, numVertices);
     }
 }
 
-R8void r8VertexBufferTransformAllVertices(R8VertexBuffer* vertexbuffer, const R8Mat4* MVPMatrix, const R8Viewport* viewport)
+void r8_vertexbuffer_data(R8VertexBuffer* vertexBuffer, R8sizei numVertices, const R8void* coords, const R8void* texCoords, R8sizei vertexStride)
 {
-    for (R8sizei i = 0; i < vertexbuffer->numVerts; ++i)
-    {
-        r8TransformVertex((vertexbuffer->vertices + i), MVPMatrix, viewport);
-    }
-}
-
-static R8void r8VertexBufferResize(R8VertexBuffer* vertexbuffer, R8sizei numVerts)
-{
-    // Check if the vertex buffer must be re-allocated
-    if (vertexbuffer->vertices == NULL || vertexbuffer->numVerts != numVerts)
-    {
-
-        R8_FREE(vertexbuffer->vertices);
-
-        vertexbuffer->vertices = R8_CALLOC(R8Vertex, numVerts);
-        vertexbuffer->numVerts = numVerts;
-    }
-}
-
-R8void r8VertexBufferAddData(R8VertexBuffer* vertexbuffer, R8sizei numVerts, const R8void* pos, const R8void* uv, const R8void* color, R8sizei stride)
-{
-    if (vertexbuffer == NULL)
+    if (vertexBuffer == NULL)
     {
         R8_ERROR(R8_ERROR_NULL_POINTER);
         return;
     }
 
-    r8VertexBufferResize(vertexbuffer, numVerts);
+    _vertexbuffer_resize(vertexBuffer, numVertices);
 
-    // offset pointers
-    const R8byte* posByteAlign = (const R8byte*)pos;
-    const R8byte* uvByteAlign = (const R8byte*)uv;
-    const R8byte* colorByteAlign = (const R8byte*)color;
+    // Get offset pointers
+    const R8byte* coordsByteAlign = (const R8byte*)coords;
+    const R8byte* texCoordsByteAlign = (const R8byte*)texCoords;
 
     // Fill vertex buffer
-    R8Vertex* vert = vertexbuffer->vertices;
+    R8Vertex* vert = vertexBuffer->vertices;
 
-    while (numVerts-- > 0)
+    while (numVertices-- > 0)
     {
-        if (posByteAlign != NULL)
+        // Copy coordinates
+        if (coordsByteAlign != NULL)
         {
-            const R8float* coord = (const R8float*)posByteAlign;
-            vert->position.x = coord[0];
-            vert->position.y = coord[1];
-            vert->position.z = coord[2];
-            vert->position.w = 1.0f;
+            const R8float* coord = (const R8float*)coordsByteAlign;
+
+            vert->coord.x = coord[0];
+            vert->coord.y = coord[1];
+            vert->coord.z = coord[2];
+            vert->coord.w = 1.0f;//coord[3];
+
+            coordsByteAlign += vertexStride;
         }
         else
         {
-            vert->position.x = 0.0f;
-            vert->position.y = 0.0f;
-            vert->position.z = 0.0f;
-            vert->position.w = 1.0f;
+            vert->coord.x = 0.0f;
+            vert->coord.y = 0.0f;
+            vert->coord.z = 0.0f;
+            vert->coord.w = 1.0f;
         }
 
-        if (uvByteAlign != NULL)
+        // Copy texture coordinates
+        if (texCoordsByteAlign != NULL)
         {
-            const R8float* texCoord = (const R8float*)uvByteAlign;
-            vert->uv.x = texCoord[0];
-            vert->uv.y = texCoord[1];
+            const R8float* texCoord = (const R8float*)texCoordsByteAlign;
 
-            uvByteAlign += stride;
+            vert->texCoord.x = texCoord[0];
+            vert->texCoord.y = texCoord[1];
+
+            texCoordsByteAlign += vertexStride;
         }
         else
         {
-            vert->uv.x = 0.0f;
-            vert->uv.y = 0.0f;
+            vert->texCoord.x = 0.0f;
+            vert->texCoord.y = 0.0f;
         }
 
-        if (colorByteAlign != NULL)
+        // Next vertex
+        ++vert;
+    }
+}
+
+void r8_vertexbuffer_data_from_file(R8VertexBuffer* vertexBuffer, R8sizei* numVertices, FILE* file)
+{
+    if (vertexBuffer == NULL || numVertices == NULL || file == NULL)
+    {
+        R8_ERROR(R8_ERROR_NULL_POINTER);
+        return;
+    }
+
+    // Read number of vertices
+    R8ushort vertCount = 0;
+    fread(&vertCount, sizeof(R8ushort), 1, file);
+    *numVertices = (R8sizei)vertCount;
+
+    _vertexbuffer_resize(vertexBuffer, *numVertices);
+
+    // Read all vertices
+    sR8_vertex data;
+    R8Vertex* vert = vertexBuffer->vertices;
+
+    for (R8ushort i = 0; i < *numVertices; ++i)
+    {
+        if (feof(file))
         {
-            const R8float* vertCol = (const R8float*)colorByteAlign;
-            vert->color.x = vertCol[0];
-            vert->color.y = vertCol[1];
-            vert->color.z = vertCol[2];
-            vert->color.w = vertCol[3];
+            R8_ERROR(R8_ERROR_UNEXPECTED_EOF);
+            return;
         }
-        else
-        {
-            vert->color.x = 1.0f;
-            vert->color.y = 0.0f;
-            vert->color.z = 1.0f;
-            vert->color.w = 1.0f;
-        }
+
+        // Read next vertex data
+        fread(&data, sizeof(sR8_vertex), 1, file);
+
+        vert->coord.x = data.x;
+        vert->coord.y = data.y;
+        vert->coord.z = data.z;
+        vert->coord.w = 1.0f;
+
+        vert->texCoord.x = data.u;
+        vert->texCoord.y = data.v;
 
         ++vert;
     }

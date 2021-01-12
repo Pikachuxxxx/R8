@@ -1,264 +1,547 @@
-/* r8.h
+/*
+ * r8.h
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.
  */
 
-#ifndef R_8_H
-#define R_8_H
+#ifndef R8_H
+#define R8_H
 
-#ifdef _cplusplus
+
+#ifdef __cplusplus
 extern "C" {
-#endif //  _cplusplus
+#endif
 
-#include "r8_constants.h"
-#include "r8_macros.h"
-#include "r8_platform.h"
-#include "r8_structs.h"
 #include "r8_types.h"
-#include "r8_error.h"
+#include "r8_error_codes.h"
+#include "r8_platform.h"
+#include "r8_macros.h"
+#include "r8_structs.h"
+#include "r8_constants.h"
 
 #include <stdio.h>
 
-/****************************************************
- *                                                  *
- *                 Initialization                   *
- *                                                  *
- ****************************************************/
 
-/// Ignite the engine
-R8bool r8Ignite();
+/**************************************************
+ *                                                *
+ *                    Common                      *
+ *                                                *
+ **************************************************/
 
-/// Flush the Render Queue
-R8bool r8Release();
+/// Initializes the R8 renderer.
+R8boolean r8Init();
 
-/// Get the error code for the error
+/// Releases the R8 renderer.
+R8boolean r8Release();
+
+/// Returns the last error. By default R8_ERROR_NONE.
 R8enum r8GetError();
 
-/// Get the errors of render state or API calls
-const char* r8GetString();
+/// Sets the error event handler.
+void r8ErrorHandler(R8_ERROR_HANDLER_PROC errorHandler);
 
-/// Sets the error handler callback
-R8void r8ErrorHandle(R8_ERROR_HANDLER_PROC errorHandler);
+/// Gets the string description for the given enum code.
+const char* r8GetString(R8enum str);
 
-/****************************************************
- *                                                  *
- *                    Context                       *
- *                                                  *
- ****************************************************/
+/// Returns the integer value for the enum code.
+R8int r8GetIntegerv(R8enum param);
 
-/// Create the Context
-R8object r8CreateContext(const R8ContextDesc* contextDesc, R8int width, R8int height);
+/**************************************************
+ *                                                *
+ *                    Context                     *
+ *                                                *
+ **************************************************/
 
-/// Delete the context
-R8void r8DeleteContext(R8object contextObject);
+/// Creates the render context.
+R8object r8CreateContext(const R8contextdesc* desc, R8uint width, R8uint height);
 
-/// Make the context active
-R8void r8MakeContextCurrent(R8object context);
 
-/// Present the currently bound frame buffer in the current render context
-R8void r8RenderPass(R8object context);
+void r8DeleteContext(R8object context);
 
-/****************************************************
- *                                                  *
- *                  Frame Buffer                    *
- *                                                  *
- ****************************************************/
 
-/// Creates the Frame Buffer object 
-R8object r8CreateFrameBuffer(R8int width, R8int height);
+void r8MakeCurrent(R8object context);
 
-/// deletes the frame buffer object 
-R8void r8DeleteFrameBuffer(R8object fbo);
+void r8Present(R8object context);
 
-/// Binds the specified frame buffer to the current render context 
-R8void r8BindFrameBuffer(R8object fbo);
 
-/// Clear the specified frame buffer and its internal flags
-R8void r8ClearFrameBuffer(R8object fbo, R8int depthMaskValue, R8bit clearFlags);
 
-/****************************************************
- *                                                  *
- *                  Vertex Buffer                   *
- *                                                  *
- ****************************************************/
+R8object r8CreateFrameBuffer(R8uint width, R8uint height);
 
-/// Creates a vertex buffer to hold the vertex data
+void r8DeleteFrameBuffer(R8object frameBuffer);
+
+/**
+Binds the specified frame buffer.
+\param[in] frameBuffer Specifies the frame buffer which is to be bound.
+If this is zero, no frame buffer is bound.
+\note After a new frame buffer has bound, the viewport and scissor must be set again.
+\see r8Viewport
+\see r8Scissor
+*/
+void r8BindFrameBuffer(R8object frameBuffer);
+
+/**
+Clears the specified frame buffer.
+\param[in] frameBuffer Specifies the frame buffer which is to be cleared.
+\param[in] clearDepth Specifies the depth value to clear the depth buffer.
+\param[in] clearFlags Specifies the clear flags. This can be a bitwise OR combination of the following bit masks:
+- R8_COLOR_BUFFER_BIT: Clears the color buffer.
+- R8_DEPTH_BUFFER_BIT: Clears the depth buffer.
+*/
+void r8ClearFrameBuffer(R8object frameBuffer, R8float clearDepth, R8bitfield clearFlags);
+
+// --- texture --- //
+
+/**
+Generates a new texture.
+\return Texture object.
+\remarks The texture must be deleted with 'r8DeleteTexture'.
+\see r8DeleteTexture
+*/
+R8object r8CreateTexture();
+
+/**
+Deletes the specified texture.
+\param[in] texture Specifies the texture which is to be deleted.
+This must be generated by 'r8CreateTexture'.
+\see r8CreateTexture
+*/
+void r8DeleteTexture(R8object texture);
+
+/**
+Binds the specified texture.
+\param[in] texture Specifies the texture which is to be bound.
+If this is zero, no texture is bound.
+*/
+void r8BindTexture(R8object texture);
+
+/**
+Sets the 2D image data to the specified texture.
+\param[in] texture Specifies the texture whose image data is to be set.
+\param[in] width Specifies the image width. This will be the final texture width.
+\param[in] height Specifies the image height. This will be the final texture height.
+\param[in] format Specifies the image data format. This must be R8_UBYTE_RGB.
+\param[in] data Raw pointer to the image data. This must be in the format: R8ubyte[width*height*3].
+\param[in] dither Specifies whether dithering is to be applied to the image (to compensate 8-bit colors).
+\param[in] generateMips Specifies whether MIP maps are to be generated for this texture.
+*/
+void r8TexImage2D(
+    R8object texture, R8texsize width, R8texsize height, R8enum format,
+    const R8void* data, R8boolean dither, R8boolean generateMips
+);
+
+/**
+Sets the 2D image data from file to the specified texture.
+\param[in] texture Specifies the texture whose image data is to be set.
+\param[in] filename Specifies the image filename. Valid image file formats are: BMP, PNG, TGA, JPEG (base line only).
+\param[in] dither Specifies whether dithering is to be applied to the image (to compensate 8-bit colors).
+\param[in] generateMips Specifies whether MIP maps are to be generated for this texture.
+\see r8TexImage2D
+*/
+void r8TexImage2DFromFile(R8object texture, const char* filename, R8boolean dither, R8boolean generateMips);
+
+/**
+Sets the texture environment parameters.
+\param[in] param Specifies the paramer whose value is to be set. Valid values are:
+- R8_TEXTURE_LOD_BIAS: Specifies the level-of-detail bias for MIP-mapping. Must be in the range [0, 255]. By default 0.
+\param[in] value Specifies the new integer value.
+*/
+void r8TexEnvi(R8enum param, R8int value);
+
+/**
+Returns a parameter of the specified texture MIP-map.
+\param[in] texture Specifies the texture whose parameter is to be determined.
+\param[in] mipLevel Specifiefs the MIP-map level.
+\param[in] param Specifies the parameter which is to be determined.
+- R8_TEXTURE_WIDTH: Returns the MIP-map texture width.
+- R8_TEXTURE_HEIGHT: Returns the MIP-map texture height.
+*/
+R8int r8GetTexLevelParameteri(R8object texture, R8ubyte mipLevel, R8enum param);
+
+// --- vertexbuffer --- //
+
+/**
+Generates a new vertex buffer with the specified number of vertices.
+\return Vertex buffer object.
+\remarks The vertex buffer must be deleted with 'r8DeleteVertexBuffer'.
+\see r8DeleteVertexBuffer
+*/
 R8object r8CreateVertexBuffer();
 
-/// Deletes the specified vertex buffer object
-R8void r8DeleteVertxBuffer(R8object vbo);
+/**
+Deletes the specified vertex buffer.
+\param[in] vertexBuffer Specifies the vertex buffer which is to be deleted.
+This must be generated by 'r8CreateVertexBuffer'.
+\see r8CreateVertexBuffer
+*/
+void r8DeleteVertexBuffer(R8object vertexBuffer);
 
-/// Add data to the vertex buffer
-// TODO: Use vector types instead of (void *)
-R8void r8VertexBufferData(R8object vbo, const R8void* vertices, const R8void* texCoords, const R8void* color, R8sizei stride, R8sizei numVerts);
+/**
+Sets the vertex buffer data.
+\param[in] vertexBuffer Specifies the vertex buffer whose vertex data is to be set.
+\param[in] numVertices Specifies the number of vertices.
+\param[in] coords Raw pointer to the vertex coordinates data.
+If this is null, the coordinate of all vertices will be initialized with { 0, 0, 0 }.
+\param[in] texCoords Raw pointer to the vertex texture coordinates data.
+If this is null, the texture coordinate of all vertices will be initialized with { 0, 0 }.
+\param[in] vertexStride Specifies the vertex stride size (in bytes).
+\code
+struct MyVertex
+{
+    R8float x, y, z;    // Vertex coordinates X, Y, Z
+    R8float u, v;       // Texture coordinates U, V
+};
+struct MyVertex[32] = ...
+r8VertexBufferData(vertexBuffer, 32, &(MyVertex[0].x), &(MyVertex[0].u), sizeof(MyVertex));
+\endcode
+*/
+void r8VertexBufferData(R8object vertexBuffer, R8sizei numVertices, const R8void* coords, const R8void* texCoords, R8sizei vertexStride);
 
-/// Binds the vertex buffer data to use the associated vertex data to render
-R8void r8BindVertexBuffer(R8object vbo);
+/**
+Reads and sets the vertex buffer data from the specified file.
+\param[in] vertexBuffer Specifies the vertex buffer whose vertex data is to be set.
+\param[out] numVertices Specifies the resulting number of vertices.
+\param[in] file Pointer to the file object. This file must be opened in binary read mode: fopen(filename, "rb").
+\code
+// File format:
+numVertices: 16-bit unsigned integer
+vertices[numVertices]: 'numVertices' * (five 32-bit floating point values for: x, y, z, u, v) (see 'R8vertex').
+\endcode
+\see R8vertex
+*/
+void r8VertexBufferDataFromFile(R8object vertexBuffer, R8sizei* numVertices, FILE* file);
 
-/****************************************************
- *                                                  *
- *                  Index Buffer                    *
- *                                                  *
- ****************************************************/
+/**
+Binds the specified vertex buffer.
+\param[in] vertexBuffer Specifies the vertex buffer which is to be bound.
+If this is zero, no vertex buffer is bound.
+*/
+void r8BindVertexBuffer(R8object vertexBuffer);
 
-/// Creates a index buffer to hold the index data to draw the vertices in a indexed manner
+// --- indexbuffer --- //
+
+/**
+Generates a new index buffer with the specified number of indices.
+\return Index buffer object.
+\remarks The index buffer must be deleted with 'r8DeleteIndexBuffer'.
+\see r8DeleteIndexBuffer
+*/
 R8object r8CreateIndexBuffer();
 
-/// Delete the specified index buffer 
-R8void r8DeleteIndexBuffer(R8object ibo);
+/**
+Deletes the specified index buffer.
+\param[in] indexBuffer Specifies the index buffer which is to be deleted.
+This must be generated by 'r8CreateIndexBuffer'.
+\see r8CreateIndexBuffer
+*/
+void r8DeleteIndexBuffer(R8object indexBuffer);
 
-/// Add data to the index buffer
-// TODO: Use vector types instead of (void*)
-R8void r8IndexBufferData(R8object ibo, const R8void* indices, R8sizei indicesCount);
+/**
+Sets the index buffer data.
+\param[in] indexBuffer Specifies the index buffer whose vertex data is to be set.
+\param[in] indices Pointer to the index data. Only 16-bit unsigned integers are allowed as vertex indices.
+\param[in] numIndices Specifies the number of indices. The array 'indices' must be large enough!
+*/
+void r8IndexBufferData(R8object indexBuffer, const R8ushort* indices, R8sizei numIndices);
 
-/// Binds the index buffer object to use the associated indices to render the vertices
-R8void r8BindIndexBuffer(R8object ibo);
+/**
+Reads and sets the index buffer data from the specified file.
+\param[in] indexBuffer Specifies the index buffer whose index data is to be set.
+\param[out] numIndices Specifies the resulting number of indices.
+\param[in] file Pointer to the file object. This file must be opened in binary read mode: fopen(filename, "rb").
+\code
+// File format:
+numIndices: 16-bit unsigned integer
+indices[numVertices]: 'numIndices' * (16-bit unsigned integer).
+\endcode
+*/
+void r8IndexBufferDataFromFile(R8object indexBuffer, R8sizei* numIndices, FILE* file);
 
-/****************************************************
- *                                                  *
- *                      Texture                     *
- *                                                  *
- ****************************************************/
+/**
+Binds the specified index buffer.
+\param[in] indexBuffer Specifies the index buffer which is to be bound.
+If this is zero, no index buffer is bound.
+*/
+void r8BindIndexBuffer(R8object indexBuffer);
 
-/// Create an object to hold the texture data
-R8object r8GenerateTexture();
+// --- matrices --- //
 
-/// Delete the texture
-R8void r8DeleteTexture(R8object texture);
+/**
+Sets the r8ojection matrix.
+\param[in] matrix4x4 Raw pointer to a 4x4 left-handed r8ojection matrix (in r8ojection space).
+\see r8BuildPerspectiveProjection
+\see r8BuildOrthogonalProjection
+*/
+void r8ProjectionMatrix(const R8float* matrix4x4);
 
-/// Bind the texture to the buffer to render onto the screen
-R8void r8BindTexture(R8object texture);
+/**
+Sets the view matrix.
+\param[in] matrix4x4 Raw pointer to a 4x4 left-handed view matrix (in view space).
+*/
+void r8ViewMatrix(const R8float* matrix4x4);
 
-/// Add data to the texture 
-R8void r8TexImage2D(R8object texture, R8int width, R8int height, R8enum format, const R8void* data, R8bool dither, R8bool generateMips);
+/**
+Sets the world matrix.
+\param[in] matrix4x4 Raw pointer to a 4x4 left-handed world matrix (in world space).
+*/
+void r8WorldMatrix(const R8float* matrix4x4);
 
-/// Whether to or not generate mip maps for the given texture
-R8void r8GenerateMipMaps(R8object texture);
+/**
+Builds a 4x4 left-handed perspective r8ojection matrix.
+\param[out] matrix4x4 Raw pointer to the resulting 4x4 matrix.
+\param[in] aspectRatio Specifies the perspective aspect ratio.
+\param[in] nearPlane Specifies the near plane.
+\param[in] farPlane Specifies the far plane.
+\param[in] fov Specifies the field-of-view angle (in radians).
+*/
+void r8BuildPerspectiveProjection(R8float* matrix4x4, R8float aspectRatio, R8float nearPlane, R8float farPlane, R8float fov);
 
-/// Sets the texture environment parameters
-R8void r8TexEnvi(R8enum param, R8int value);
+/**
+Builds a 4x4 left-handed orthogonal r8ojection matrix.
+\param[out] matrix4x4 Raw pointer to the resulting 4x4 matrix.
+\param[in] width Specifies the orthogonal width.
+\param[in] height Specifies the orthogonal height.
+\param[in] nearPlane Specifies the near plane.
+\param[in] farPlane Specifies the far plane.
+*/
+void r8BuildOrthogonalProjection(R8float* matrix4x4, R8float width, R8float height, R8float nearPlane, R8float farPlane);
 
-/****************************************************
- *                                                  *
- *             MVP and Transformations              *
- *                                                  *
- ****************************************************/
+/**
+Translates the specified 4x4 left-handed matrix.
+\param[in,out] matrix4x4 Raw pointer to the 4x4 matrix which is to be translated.
+\param[in] x Specifies the X direction.
+\param[in] y Specifies the Y direction.
+\param[in] z Specifies the Z direction.
+*/
+void r8Translate(R8float* matrix4x4, R8float x, R8float y, R8float z);
 
-/// Sets the global model matrix
-R8void r8ModelMatrix(const R8float* matrix4x4);
+/**
+Rotates the specified 4x4 left-handed matrix in a free angle.
+\param[in,out] matrix4x4 Raw pointer to the 4x4 matrix which is to be rotated.
+\param[in] x Specifies the X rotation axis.
+\param[in] y Specifies the Y rotation axis.
+\param[in] z Specifies the Z rotation axis.
+\param[in] angle Specifies the rotation angle (in radians).
+*/
+void r8Rotate(R8float* matrix4x4, R8float x, R8float y, R8float z, R8float angle);
 
-/// Sets the global view matrix
-R8void r8ViewMatrix(const R8float* matrix4x4);
+/**
+Scales the specified 4x4 left-handed matrix.
+\param[in,out] matrix4x4 Raw pointer to the 4x4 matrix which is to be scaled.
+\param[in] x Specifies the width.
+\param[in] y Specifies the height.
+\param[in] z Specifies the depth.
+*/
+void r8Scale(R8float* matrix4x4, R8float x, R8float y, R8float z);
 
-/// Sets the global projection matrix
-R8void r8ProjectionMatrix(const R8float* matrix4x4);
+/**
+Loads the identity of  the specified 4x4 left-handed matrix.
+\param[out] matrix4x4 Raw pointer to the 4x4 matrix whose identity is to be loaded.
+*/
+void r8LoadIdentity(R8float* matrix4x4);
 
-/// Generate a 4x4 perspective matrix
-R8void r8GeneratePerpspectiveMatrix(const R8float* matrix4x4,R8float fov, R8float aspectRatio, R8float nearPlane, R8float farPlane);
+// --- states --- //
 
-/// Generate a 4x4 orthographic matrix
-R8void r8GenerateOrthographicMatrix(const R8float* matrix4x4,R8float left, R8float right, R8float top, R8float bottom, R8float nearPlane, R8float farPlane);
+/**
+Sets the specified state.
+\param[in] cap Specifies the capability whose state is to be changed. Valid values are:
+- R8_SCISSOR - Enables/disables the scissor rectangle (see r8Scissor). By default R8_FALSE.
+\param[in] state Specifies the new state.
+\see r8Enable
+\see r8Disable
+*/
+void r8SetState(R8enum cap, R8boolean state);
 
-/// Generates a translation matrix
-R8void r8Translate(const R8float* matrix4x4,R8float x, R8float y, R8float z);
+/**
+Returns the current value of the specified state.
+\param[in] cap Specifies the capability whose state is to be returned.
+\see r8SetState
+*/
+R8boolean r8GetState(R8enum cap);
 
-/// Generates a rotation matrix 
-R8void r8Rotate(const R8float* matrix4x4,R8float x, R8float y, R8float z, R8float angle);
+/**
+Enables the specified capability. This is equivalent to:
+\code
+r8SetState(cap, R8_TRUE);
+\endcode
+\see r8SetState
+*/
+void r8Enable(R8enum cap);
 
-/// Generates a scaling matrix
-R8void r8Scale(const R8float* matrix4x4,R8float x, R8float y, R8float z);
+/**
+Disables the specified capability. This is equivalent to:
+\code
+r8SetState(cap, R8_FALSE);
+\endcode
+\see r8SetState
+*/
+void r8Disable(R8enum cap);
 
-/// Generates the identity of the specified 4x4 left-handed matrix
-R8void r8Identity(R8float* matrix4x4);
+/**
+Sets the viewport for the currently bound framebuffer.
+\note A frame buffer must be bound before this function can be used!
+\see r8BindFrameBuffer
+*/
+void r8Viewport(R8int x, R8int y, R8int width, R8int height);
 
-/****************************************************
- *                                                  *
- *                 Render States                    *
- *                                                  *
- ****************************************************/
+/**
+Sets the scissor rectangle for the currently bound framebuffer.
+\note A frame buffer must be bound before this function can be used!
+\see r8BindFrameBuffer
+*/
+void r8Scissor(R8int x, R8int y, R8int width, R8int height);
 
-/// Sets the specified state for the functionality
-R8void r8SetState(R8enum cap, R8bool state);
+/**
+Sets the depth range for the currently bound framebuffer.
+\note A frame buffer must be bound before this function can be used!
+\see r8BindFrameBuffer
+*/
+void r8DepthRange(R8float minDepth, R8float maxDepth);
 
-/// Enable the specified functionality
-R8void r8Enable(R8enum functionality);
+/**
+Sets the face culling mode.
+\param[in] mode Specifies the new culling mode.
+This must be R8_CULL_NONE, R8_CULL_FRONT or R8_CULL_BACK.
+By default R8_CULL_NONE.
+*/
+void r8CullMode(R8enum mode);
 
-/// Disable the specified functionality
-R8void r8Disable(R8enum functionality);
+/**
+Sets the polygon drawing mode.
+\param[in] mode Specifies the new polygon mode.
+This must be R8_POLYGON_FILL, R8_POLYGON_LINE or R8_POLYGON_POINT.
+By default R8_POLYGON_FILL.
+*/
+void r8PolygonMode(R8enum mode);
 
-/// Sets the culling mode 
-R8void r8CullMode(R8enum mode);
+// --- drawing --- //
 
-/// Sets the polygon drawing mode
-R8void r8PolygonDrawMode(R8enum mode);
+/// Sets the clear color. Default is (0, 0, 0).
+void r8ClearColor(R8ubyte r, R8ubyte g, R8ubyte b);
 
-/// Sets the depth range of the depth buffer of the currently bound frame buffer
-R8void r8SetDepthRange(R8float min, R8float max);
+/// Binds the current color index.
+void r8Color(R8ubyte r, R8ubyte g, R8ubyte b);
 
-/// Set the viewport position and dimensions
-R8void r8Viewport(R8int x, R8int y, R8int width, R8int height);
+/// Draws a single 2D point onto the screen.
+void r8DrawScreenPoint(R8int x, R8int y);
 
-/// Sets the scissoring rectangle dimensions
-R8void r8ScissorRect(R8int x, R8int y, R8int width, R8int height);
+/// Draws a single 2D line onto the screen.
+void r8DrawScreenLine(R8int x1, R8int y1, R8int x2, R8int y2);
 
-/****************************************************
- *                                                  *
- *                Drawing functions                 *
- *                                                  *
- ****************************************************/
+/// Draws a single 2D image with the currently bound texture.
+void r8DrawScreenImage(R8int left, R8int top, R8int right, R8int bottom);
 
-/// Set the clear color of the window's background
-R8void r8ClearColor(R8ubyte r, R8ubyte g, R8ubyte b);
+/**
+Draws the specified amount of priitives.
+\param[in] priitives Specifies the priitive types. Valid values are:
+R8_POINTS, R8_LINES, R8_LINE_STRIP, R8_LINE_LOOP, R8_TRIANGLES, R8_TRIANGLE_STRIP, R8_TRIANGLE_FAN.
+\param[in] numVertices Specifies the number of vertices to draw.
+\param[in] firstVertex Specifies the first vertex to draw.
+\remarks A vertex buffer must be bound.
+\see r8BindVertexBuffer
+*/
+void r8Draw(R8enum priitives, R8ushort numVertices, R8ushort firstVertex);
 
-/// Bind the color to render
-R8void r8BindColor(R8ubyte r, R8ubyte g, R8ubyte b);
+/**
+Draws the specified amount of priitives.
+\param[in] priitives Specifies the priitive types. Valid values are:
+R8_POINTS, R8_LINES, R8_LINE_STRIP, R8_LINE_LOOP, R8_TRIANGLES, R8_TRIANGLE_STRIP, R8_TRIANGLE_FAN.
+\param[in] numVertices Specifies the number of vertices to draw.
+\param[in] firstVertex Specifies the first vertex to draw.
+\remarks A vertex buffer and an index buffer must be bound.
+\see r8BindVertexBuffer
+\see r8BindIndexBuffer
+*/
+void r8DrawIndexed(R8enum priitives, R8ushort numVertices, R8ushort firstVertex);
 
-/// Draw the vertices using the VBO
-R8void r8Draw(R8enum primitive, R8ushort verticesCount, R8ushort vertexOffset);
+// --- immediate mode --- //
 
-/// Draw vertices using indices bound to IBO
-R8void r8DrawIndexed(R8enum primitive, R8ushort indicesCount, R8ushort indexOffset);
+/**
+Begins the immediate drawing mode.
+\param[in] priitives Specifies the priitive types. Valid values are:
+R8_POINTS, R8_LINES, R8_LINE_STRIP, R8_LINE_LOOP, R8_TRIANGLES, R8_TRIANGLE_STRIP, R8_TRIANGLE_FAN.
+\remarks This must be finished by calling "r8End". Here is a usage example:
+\code
+// Draw a quad
+r8Begin(R8_TRIANGLE_STRIP);
+{
+    r8TexCoord2i(0, 0);
+    r8Vertex2i(-1, 1);
 
-//----------------Drawing utility functions--------------
+    r8TexCoord2i(1, 0);
+    r8Vertex2i(1, 1);
 
-/// Draw a point
-R8void r8DrawPoint(R8float x, R8float y);
+    r8TexCoord2i(0, 1);
+    r8Vertex2i(-1, -1);
 
-/// Draw a line 
-R8void r8DrawLine(R8float x1, R8float y1, R8float x2, R8float y2);
-
-/// Draw a texture onto the screen
-R8void r8DrawTexture(R8int left, R8int top, R8int right, R8int bottom);
-
-/****************************************************
- *                                                  *
- *              Immediate mode Drawing              *
- *                                                  *
- ****************************************************/
-/// Begin immediate drawing mode
-R8void r8Begin(R8enum primitive);
-
-/// End immediate drawing mode
-R8void r8End();
-
-/// Sets the 2d coordinates for the current vertex
-R8void r8Vertex2f(R8float x, R8float y);
-
-/// Sets the 3d coordinates for the current vertex
-R8void r8Vertex3f(R8float x, R8float y, R8float z);
-
-/// Sets the 4d coordinates for the current vertex
-R8void r8Vertex4f(R8float x, R8float y, R8float z, R8float w);
-
-/// Sets the texture coordinates of the current vertex
-R8void r8TexCoord2f(R8float s, R8float t);
-
-/// Sets the color of the current vertex
-R8void r8VertexColor4f(R8float r, R8float g, R8float b, R8float a);
-
-#ifdef _cplusplus
+    r8TexCoord2i(1, 1);
+    r8Vertex2i(1, -1);
 }
-#endif // _cplusplus
+r8End();
+\encode
+\remarks This is equivalent to drawing the priitives with a vertex buffer (but no index buffer).
+\note This is slower than using a vertex buffer. A global immediate vertex buffer is used,
+to draw the priitives. This internal global buffer is severely limited (by default 32 vertices).
+However, you can drawn unlimited priitives, since the buffer works like a stream,
+which will be flushed when it's full (i.e. the current content will be drawn to the frame buffer).
+\see r8End
+\see r8Draw
+*/
+void r8Begin(R8enum priitives);
+/**
+Ends the immediate drawing mode.
+\remarks This must be started by calling "r8Begin".
+\see r8Begin
+*/
+void r8End();
 
-#endif // Header gaurd
+/**
+Sets the texture coordinates of the current vertex in the immediate drawing mode.
+\remarks This must be called between "r8Begin" and "r8End".
+\see r8Begin
+\see r8End
+*/
+void r8TexCoord2f(R8float u, R8float v);
+
+// \see r8TexCoord2f
+void r8TexCoord2i(R8int u, R8int v);
+
+/**
+Sets the coordinates of the current vertex in the immediate drawing mode.
+This function will also increment the vertex counter,
+i.e. the next calls to "r8TexCoord..." will configure the next vertex.
+Thus call "r8Vertex..." only when all configurations for the current vertex are done.
+\remarks This must be called between "r8Begin" and "r8End".
+\see r8Begin
+\see r8End
+*/
+void r8Vertex4f(R8float x, R8float y, R8float z, R8float w);
+
+/// \see r8Vertex4f
+void r8Vertex4i(R8int x, R8int y, R8int z, R8int w);
+
+/**
+Sets the coordinates of the current vertex. The 'w' component will be set to 1.0.
+\see r8Vertex4f
+*/
+void r8Vertex3f(R8float x, R8float y, R8float z);
+
+/// \see r8Vertex3f
+void r8Vertex3i(R8int x, R8int y, R8int z);
+
+/**
+Sets the coordinates of the current vertex.
+The 'z' component will be set to 0.0 and the 'w' component will be set to 1.0.
+\see r8Vertex4f
+*/
+void r8Vertex2f(R8float x, R8float y);
+
+/// \see r8Vertex2f
+void r8Vertex2i(R8int x, R8int y);
+
+
+#ifdef __cplusplus
+} // /extern "C"
+#endif
+
+#endif
