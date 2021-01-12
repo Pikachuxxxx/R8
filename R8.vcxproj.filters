@@ -15,28 +15,52 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\r8_macros.h">
+    <ClInclude Include="source\platform\win32\context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\r8_errors.h">
+    <ClInclude Include="source\plugins\stb\stb_image.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\plugins\stb\stb_image_write.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\r8_constants.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\r8_structs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\r8.h">
+    <ClInclude Include="include\r8_types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\r8_platform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\rasterizer\r8_color.h">
+    <ClInclude Include="include\r8_error_codes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\r8.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\r8_macros.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\rasterizer\r8_config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_color_rgb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_color_bgr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_color.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="source\rasterizer\r8_color_palette.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_error.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\rasterizer\r8_external_math.h">
@@ -48,46 +72,49 @@
     <ClInclude Include="source\rasterizer\r8_pixel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\r8_error_codes.h">
+    <ClInclude Include="source\rasterizer\r8_vector2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\rasterizer\r8_vertex.h">
+    <ClInclude Include="source\rasterizer\r8_vector3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\rasterizer\r8_viewport.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\rasterizer\r8_vertexbuffer.h">
+    <ClInclude Include="source\rasterizer\r8_vector4.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\rasterizer\r8_matrix4.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\rasterizer\r8_indexbuffer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\rasterizer\r8_error.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\rasterizer\r8_raster_vertex.h">
+    <ClInclude Include="source\rasterizer\r8_rect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\rasterizer\r8_raster_triangle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\rasterizer\r8_quad.h">
+    <ClInclude Include="source\rasterizer\r8_raster_vertex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_viewport.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\rasterizer\r8_framebuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\rasterizer\r8_global_state.h">
+    <ClInclude Include="source\rasterizer\r8_vertex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_vertexbuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_indexbuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\rasterizer\r8_image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\rasterizer\r8_texture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\rasterizer\r8_image.h">
+    <ClInclude Include="source\rasterizer\r8_global_state.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\rasterizer\r8_state_machine.h">
@@ -96,69 +123,63 @@
     <ClInclude Include="source\rasterizer\r8_renderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\r8_types.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\platform\win32\context.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="include\r8_constants.h">
+    <ClCompile Include="source\platform\win32\context.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_color_palette.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="source\rasterizer\r8_error.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="source\rasterizer\r8_external_math.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\rasterizer\r8_vertex.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\rasterizer\r8_viewport.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\r8.c">
+    <ClCompile Include="source\rasterizer\r8_vector3.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_matrix4.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\rasterizer\r8_vertexbuffer.c">
+    <ClCompile Include="source\rasterizer\r8_rect.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\rasterizer\r8_indexbuffer.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\rasterizer\r8_error.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\rasterizer\r8_quad.c">
+    <ClCompile Include="source\rasterizer\r8_viewport.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_framebuffer.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\rasterizer\r8_global_state.c">
+    <ClCompile Include="source\rasterizer\r8_vertex.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\rasterizer\r8_vertexbuffer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\r8.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\rasterizer\r8_indexbuffer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\rasterizer\r8_image.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_texture.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\rasterizer\r8_image.c">
+    <ClCompile Include="source\rasterizer\r8_global_state.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_state_machine.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\rasterizer\r8_renderer.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\platform\win32\context.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

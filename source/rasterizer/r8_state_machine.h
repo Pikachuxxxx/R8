@@ -1,20 +1,23 @@
-/* r8_state_machine.h
+/*
+ * r8_state_machine.h
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.
  */
 
-#ifndef R_8_STATE_MACHINE_H
-#define R_8_STATE_MACHINE_H
+#ifndef R8_STATE_MACHINE_H
+#define R8_STATE_MACHINE_H
 
+
+#include "r8_matrix4.h"
 #include "r8_viewport.h"
-#include "r8_quad.h"
+#include "r8_rect.h"
 #include "r8_framebuffer.h"
 #include "r8_vertexbuffer.h"
+#include "r8_indexbuffer.h"
 #include "r8_texture.h"
 #include "r8_macros.h"
-#include "r8_matrix4.h"
-#include "r8_indexbuffer.h"
+
 
 #define R8_STATE_MACHINE    (*stateMachine_)
 #define R8_NUM_STATES       2
@@ -22,67 +25,71 @@
 
 typedef struct R8StateMachine
 {
-    R8Mat4              projectionMatrix;
-    R8Mat4              viewMatrix;
-    R8Mat4              modelMatrix;
-    R8Mat4              viewProjectionMatrix;
-    R8Mat4              modelViewMatrix;
-    R8Mat4              MVPMatrix;
+    R8Matrix4          r8ojectionMatrix;
+    R8Matrix4          viewMatrix;
+    R8Matrix4          worldMatrix;
+    R8Matrix4          viewProjectionMatrix;
+    R8Matrix4          worldViewMatrix;
+    R8Matrix4          worldViewProjectionMatrix;
 
-    R8Viewport          viewport;
+    R8Viewport         viewport;
 
-    R8Quad              viewportQuad;
-    R8Quad              scissorQuad;
-    R8Quad              clipQuad;
+    R8Rect             viewportRect;
+    R8Rect             scissorRect;
+    R8Rect             clipRect;
 
-    R8FrameBuffer*      framebuffer;
-    R8VertexBuffer*     vertexbuffer;
-    R8IndexBuffer*      indexbuffer;
-    R8Texture*          texture;
+    R8FrameBuffer*     boundFrameBuffer;
+    R8VertexBuffer*    boundVertexBuffer;
+    R8IndexBuffer*     boundIndexBuffer;
+    R8Texture*         boundTexture;
 
-    R8ColorBuffer       clearColor;
-    R8ColorBuffer       color0;
-    R8ubyte             textureLODBias;
+    R8ColorBuffer        clearColor;
+    R8ColorBuffer        color0;                 // Active color index
+    R8ubyte             textureLodBias;
 
     R8enum              cullMode;
     R8enum              polygonMode;
 
-    R8bool              states[R8_NUM_STATES];
+    R8boolean           states[R8_NUM_STATES];
 
-    R8sizei             refCounter;
-}R8StateMachine;
+    R8sizei             refCounter;                 // Object reference counter
+}
+R8StateMachine;
 
 
+/// Reference to the state machine of the current context.
 extern R8StateMachine* stateMachine_;
 
-R8void r8AddSMRef(R8object object);
-R8void r8ReleaseSMRef(R8object object);
-R8void r8AssertSMRef(R8StateMachine* stateMachine);
 
-R8void r8InitStateMachine(R8StateMachine* stateMachine);
-R8void r8InitNullStateMachine();
+void r8_ref_add(R8object obj);
+void r8_ref_release(R8object obj);
+void r8_ref_assert(R8StateMachine* stateMachine);
 
-R8void r8StateMachineMakeCurrent(R8StateMachine* stateMachine);
+void r8_state_machine_init(R8StateMachine* stateMachine);
+void r8_state_machine_init_null();
 
-R8void r8StateMachineSetState(R8enum cap, R8bool state);
-R8bool r8StateMachineGetState(R8enum cap);
+void r8_state_machine_makecurrent(R8StateMachine* stateMachine);
 
-R8void r8StateMachineSetTexenvi(R8enum param, R8int value);
-R8int  r8StateMachineGetTexenvi(R8enum param);
+void r8_state_machine_set_state(R8enum cap, R8boolean state);
+R8boolean r8_state_machine_get_state(R8enum cap);
 
-R8void r8StateMachineBindFrameBuffer(R8FrameBuffer* frameBuffer);
-R8void r8StateMachineBindVertexBuffer(R8VertexBuffer* vertexBuffer);
-R8void r8StateMachineBindIndexBuffer(R8IndexBuffer* indexBuffer);
-R8void r8StateMachineBindexture(R8Texture* texture);
+void r8_state_machine_set_texenvi(R8enum param, R8int value);
+R8int r8_state_machine_get_texenvi(R8enum param);
 
-R8void r8StateMachineViewport(R8int x, R8int y, R8int width, R8int height);
-R8void r8StateMachineDepthRange(R8float minDepth, R8float maxDepth);
-R8void r8StateMachineScissor(R8int x, R8int y, R8int width, R8int height);
-R8void r8StateMachineCullMode(R8enum mode);
-R8void r8StateMachinePolygonMode(R8enum mode);
+void r8_state_machine_bind_framebuffer(R8FrameBuffer* frameBuffer);
+void r8_state_machine_bind_vertexbuffer(R8VertexBuffer* vertexBuffer);
+void r8_state_machine_bind_indexbuffer(R8IndexBuffer* indexBuffer);
+void r8_state_machine_bind_texture(R8Texture* texture);
 
-R8void r8StateMachineProjectionMatrix(const R8Mat4* matrix);
-R8void r8StateMachineViewMatrix(const R8Mat4* matrix);
-R8void r8StateMachineModelMatrix(const R8Mat4* matrix);
+void r8_state_machine_viewport(R8int x, R8int y, R8int width, R8int height);
+void r8_state_machine_depth_range(R8float minDepth, R8float maxDepth);
+void r8_state_machine_scissor(R8int x, R8int y, R8int width, R8int height);
+void r8_state_machine_cull_mode(R8enum mode);
+void r8_state_machine_polygon_mode(R8enum mode);
+
+void r8_state_machine_r8ojection_matrix(const R8Matrix4* matrix);
+void r8_state_machine_view_matrix(const R8Matrix4* matrix);
+void r8_state_machine_world_matrix(const R8Matrix4* matrix);
+
 
 #endif

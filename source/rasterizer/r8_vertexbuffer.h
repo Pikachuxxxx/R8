@@ -1,33 +1,51 @@
-/* r8_vertexbuffer.h
+/*
+ * r8_vertexbuffer.h
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.
  */
 
-#ifndef R_8_VERTEX_BUFFER_H
-#define R_8_VERTEX_BUFFER_H
+#ifndef R8_VERTEXBUFFER_H
+#define R8_VERTEXBUFFER_H
+
 
 #include "r8_vertex.h"
 #include "r8_viewport.h"
-#include "r8_matrix4.h"
+#include "r8_structs.h"
 
 #include <stdio.h>
 
+
 typedef struct R8VertexBuffer
 {
-    R8sizei     numVerts;
-    R8Vertex*   vertices;
-}R8VertexBuffer;
+    R8sizei     numVertices;
+    R8Vertex*  vertices;
+}
+R8VertexBuffer;
 
-R8VertexBuffer* r8VertexBufferGenerate();
-R8void r8VertexBufferDelete(R8VertexBuffer* buffer);
 
-R8void r8VertexBufferInit(R8VertexBuffer* buffer, R8sizei numVerts);
-R8void r8VertexBufferClear(R8VertexBuffer* buffer);
+R8VertexBuffer* r8_vertexbuffer_create();
+void r8_vertexbuffer_delete(R8VertexBuffer* vertexBuffer);
 
-R8void r8VertexBufferTransformVertices(R8sizei numVerts, R8sizei firstVertex, R8VertexBuffer* vertexbuffer, const R8Mat4* MVPMatrix, const R8Viewport* viewport);
-R8void r8VertexBufferTransformAllVertices(R8VertexBuffer* vertexbuffer, const R8Mat4* MVPMatrix, const R8Viewport* viewport);
+void r8_vertexbuffer_singular_init(R8VertexBuffer* vertexBuffer, R8sizei numVertices);
+void r8_vertexbuffer_singular_clear(R8VertexBuffer* vertexBuffer);
 
-R8void r8VertexBufferAddData(R8VertexBuffer* vertexbuffer, R8sizei numVerts, const R8void* pos, const R8void* uy, const R8void* color, R8sizei stride);
+void r8_vertexbuffer_transform(
+    R8sizei numVertices,
+    R8sizei firstVertex,
+    R8VertexBuffer* vertexBuffer,
+    const R8Matrix4* worldViewProjectionMatrix,
+    const R8Viewport* viewport
+);
+
+void r8_vertexbuffer_transform_all(
+    R8VertexBuffer* vertexBuffer,
+    const R8Matrix4* worldViewProjectionMatrix,
+    const R8Viewport* viewport
+);
+
+void r8_vertexbuffer_data(R8VertexBuffer* vertexBuffer, R8sizei numVertices, const R8void* coords, const R8void* texCoords, R8sizei vertexStride);
+void r8_vertexbuffer_data_from_file(R8VertexBuffer* vertexBuffer, R8sizei* numVertices, FILE* file);
+
 
 #endif

@@ -1,10 +1,13 @@
-/* r8.c
+/*
+ * r8.c
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.
  */
 
 #include "r8.h"
+#include "r8_error.h"
+#include "context.h"
 #include "r8_framebuffer.h"
 #include "r8_vertexbuffer.h"
 #include "r8_indexbuffer.h"
@@ -14,405 +17,453 @@
 #include "r8_global_state.h"
 #include "r8_renderer.h"
 #include "r8_memory.h"
-#include "context.h"
 
-#include <string.h> // memset
+#include <string.h>
 
 
-/****************************************************
- *                                                  *
- *                 Initialization                   *
- *                                                  *
- ****************************************************/
+// --- common --- //
 
-R8bool r8Ignite()
+R8boolean r8Init()
 {
-    r8InitNullStateMachine();
-    r8GlobalStateInit();
+    r8_state_machine_init_null();
+    r8_global_state_init();
     return R8_TRUE;
 }
 
-R8bool r8Release()
+R8boolean r8Release()
 {
-    r8GlobalStateRelease();
+    r8_global_state_release();
     return R8_TRUE;
 }
 
 R8enum r8GetError()
 {
-    return r8GetError();
+    return r8_error_get();
 }
 
-const char* r8GetString()
+void r8ErrorHandler(R8_ERROR_HANDLER_PROC errorHandler)
 {
-    // TODO: To be implemented yet
+    r8_error_set_handler(errorHandler);
 }
 
-R8void r8ErrorHandle(R8_ERROR_HANDLER_PROC errorHandler)
+const char* r8GetString(R8enum str)
 {
-    r8SetErrorHandler(errorHandler);
+    switch (str)
+    {
+        case R8_STRING_VERSION:
+            return R8_VERSION_STR;
+        case R8_STRING_RENDERER:
+            return "R8";
+        case R8_STRING_PLUGINS:
+            #ifdef R8_INCLUDE_PLUGINS
+            return "stb_image;";
+            #else
+            return "";
+            #endif
+    }
+    return NULL;
 }
 
-/****************************************************
- *                                                  *
- *                    Context                       *
- *                                                  *
- ****************************************************/
-
-R8object r8CreateContext(const R8ContextDesc* contextDesc, R8int width, R8int height)
+R8int r8GetIntegerv(R8enum param)
 {
-    return (R8object)r8ContextCreate(contextDesc, width, height);
+    switch (param)
+    {
+        case R8_MAX_TEXTURE_SIZE:
+            return R8_MAX_TEX_SIZE;
+    }
+    return 0;
 }
 
-R8void r8DeleteContext(R8object contextObject)
+// --- context --- //
+
+R8object r8CreateContext(const R8contextdesc* desc, R8uint width, R8uint height)
 {
-    r8ContextDelete((R8Context*)contextObject);
+    return (R8object)r8_context_create(desc, width, height);
 }
 
-R8void r8MakeContextCurrent(R8object context)
+void r8DeleteContext(R8object context)
 {
-    r8ContextMakeCurrent((R8Context*)context);
+    r8_context_delete((R8Context*)context);
 }
 
-R8void r8RenderPass(R8object context)
+void r8MakeCurrent(R8object context)
 {
-    r8ContextPresent((R8Context*)context, R8_STATE_MACHINE.framebuffer);
+    r8_context_makecurrent((R8Context*)context);
 }
 
-/****************************************************
- *                                                  *
- *                  Frame Buffer                    *
- *                                                  *
- ****************************************************/
-
-R8object r8CreateFrameBuffer(R8int width, R8int height)
+void r8Present(R8object context)
 {
-    return (R8object)r8FrameBufferGenerate(width, height);
+    r8_context_present((R8Context*)context, R8_STATE_MACHINE.boundFrameBuffer);
 }
 
-R8void r8DeleteFrameBuffer(R8object fbo)
+// --- framebuffer --- //
+
+R8object r8CreateFrameBuffer(R8uint width, R8uint height)
 {
-    r8FrameBufferDelete((R8FrameBuffer*)fbo);
+    return (R8object)r8_framebuffer_create(width, height);
 }
 
-R8void r8BindFrameBuffer(R8object fbo)
+void r8DeleteFrameBuffer(R8object frameBuffer)
 {
-    r8StateMachineBindFrameBuffer((R8FrameBuffer*)fbo);
+    r8_framebuffer_delete((R8FrameBuffer*)frameBuffer);
 }
 
-R8void r8ClearFrameBuffer(R8object fbo, R8int depthMaskValue, R8bit clearFlags)
+void r8BindFrameBuffer(R8object frameBuffer)
 {
-    r8FrameBufferClear((R8FrameBuffer*)fbo, depthMaskValue, clearFlags);
+    r8_state_machine_bind_framebuffer((R8FrameBuffer*)frameBuffer);
 }
 
-/****************************************************
- *                                                  *
- *                  Vertex Buffer                   *
- *                                                  *
- ****************************************************/
+void r8ClearFrameBuffer(R8object frameBuffer, R8float clearDepth, R8bitfield clearFlags)
+{
+    r8_framebuffer_clear((R8FrameBuffer*)frameBuffer, clearDepth, clearFlags);
+}
+
+// --- texture --- //
+
+R8object r8CreateTexture()
+{
+    return (R8object)r8_texture_create();
+}
+
+void r8DeleteTexture(R8object texture)
+{
+    r8_texture_delete((R8Texture*)texture);
+}
+
+void r8BindTexture(R8object texture)
+{
+    r8_state_machine_bind_texture((R8Texture*)texture);
+}
+
+void r8TexImage2D(
+    R8object texture, R8texsize width, R8texsize height, R8enum format,
+    const R8void* data, R8boolean dither, R8boolean generateMips)
+{
+    r8_texture_image2d((R8Texture*)texture, width, height, format, data, dither, generateMips);
+}
+
+void r8TexImage2DFromFile(
+    R8object texture, const char* filename, R8boolean dither, R8boolean generateMips)
+{
+    R8Image* image = r8_image_load_from_file(filename);
+
+    r8_texture_image2d(
+        (R8Texture*)texture,
+        (R8texsize)(image->width),
+        (R8texsize)(image->height),
+        R8_UBYTE_RGB,
+        image->colors,
+        dither,
+        generateMips
+    );
+
+    r8_image_delete(image);
+}
+
+void r8TexEnvi(R8enum param, R8int value)
+{
+    r8_state_machine_set_texenvi(param, value);
+}
+
+R8int r8GetTexLevelParameteri(R8object texture, R8ubyte mipLevel, R8enum param)
+{
+    return r8_texture_get_mip_parameter((const R8Texture*)texture, mipLevel, param);
+}
+
+// --- vertexbuffer --- //
 
 R8object r8CreateVertexBuffer()
 {
-    return (R8object)r8VertexBufferGenerate();
+    return (R8object)r8_vertexbuffer_create();
 }
 
-R8void r8DeleteVertxBuffer(R8object vbo)
+void r8DeleteVertexBuffer(R8object vertexBuffer)
 {
-    r8VertexBufferDelete((R8VertexBuffer*)vbo);
+    r8_vertexbuffer_delete((R8VertexBuffer*)vertexBuffer);
 }
 
-R8void r8VertexBufferData(R8object vbo, const R8void* vertices, const R8void* texCoords, const R8void* color, R8sizei stride, R8sizei numVerts)
+void r8VertexBufferData(R8object vertexBuffer, R8sizei numVertices, const R8void* coords, const R8void* texCoords, R8sizei vertexStride)
 {
-     r8VertexBufferAddData(vbo, numVerts, vertices, texCoords, color, stride);
+    r8_vertexbuffer_data((R8VertexBuffer*)vertexBuffer, numVertices, coords, texCoords, vertexStride);
 }
 
-R8void r8BindVertexBuffer(R8object vbo)
+void r8VertexBufferDataFromFile(R8object vertexBuffer, R8sizei* numVertices, FILE* file)
 {
-    r8StateMachineBindVertexBuffer(vbo);
+    r8_vertexbuffer_data_from_file((R8VertexBuffer*)vertexBuffer, numVertices, file);
 }
 
-/****************************************************
- *                                                  *
- *                  Index Buffer                    *
- *                                                  *
- ****************************************************/
+void r8BindVertexBuffer(R8object vertexBuffer)
+{
+    r8_state_machine_bind_vertexbuffer((R8VertexBuffer*)vertexBuffer);
+}
+
+// --- indexbuffer --- //
 
 R8object r8CreateIndexBuffer()
 {
-    return (R8object)r8IndexBufferCreate();
+    return (R8object)r8_indexbuffer_create();
 }
 
-R8void r8DeleteIndexBuffer(R8object ibo)
+void r8DeleteIndexBuffer(R8object indexBuffer)
 {
-    r8IndexBufferDelete((R8IndexBuffer*)ibo);
+    r8_indexbuffer_delete((R8IndexBuffer*)indexBuffer);
 }
 
-R8void r8IndexBufferData(R8object ibo, const R8void* indices, R8sizei indicesCount)
+void r8IndexBufferData(R8object indexBuffer, const R8ushort* indices, R8sizei numIndices)
 {
-    r8IndexBufferAddData((R8IndexBuffer*)ibo, indices, indicesCount);
+    r8_indexbuffer_data((R8IndexBuffer*)indexBuffer, indices, numIndices);
 }
 
-R8void r8BindIndexBuffer(R8object ibo)
+void r8IndexBufferDataFromFile(R8object indexBuffer, R8sizei* numIndices, FILE* file)
 {
-    r8StateMachineBindIndexBuffer((R8IndexBuffer*)ibo);
+    r8_indexbuffer_data_from_file((R8IndexBuffer*)indexBuffer, numIndices, file);
 }
 
-/****************************************************
- *                                                  *
- *                      Texture                     *
- *                                                  *
- ****************************************************/
-
-R8object r8GenerateTexture()
+void r8BindIndexBuffer(R8object indexBuffer)
 {
-    return (R8Texture*)r8TextureGenerate();
+    r8_state_machine_bind_indexbuffer((R8IndexBuffer*)indexBuffer);
 }
 
-R8void r8DeleteTexture(R8object texture)
+// --- matrices --- //
+
+void r8ProjectionMatrix(const R8float* matrix4x4)
 {
-    r8TextureDelete((R8Texture*)texture);
+    r8_state_machine_r8ojection_matrix((R8Matrix4*)matrix4x4);
 }
 
-R8void r8BindTexture(R8object texture)
+void r8ViewMatrix(const R8float* matrix4x4)
 {
-    r8StateMachineBindexture((R8Texture*)texture);
+    r8_state_machine_view_matrix((R8Matrix4*)matrix4x4);
 }
 
-R8void r8TexImage2D(R8object texture, R8int width, R8int height, R8enum format, const R8void* data, R8bool dither, R8bool generateMips)
+void r8WorldMatrix(const R8float* matrix4x4)
 {
-    r8TextureImage2d((R8Texture*)texture, width, height, format, data, dither, generateMips);
+    r8_state_machine_world_matrix((R8Matrix4*)matrix4x4);
 }
 
-R8void r8GenerateMipMaps(R8object texture)
+void r8BuildPerspectiveProjection(
+    R8float* matrix4x4, R8float aspectRatio, R8float nearPlane, R8float farPlane, R8float fov)
 {
-    // TODO: To be implemented yet
+    r8_matrix_build_perspective((R8Matrix4*)matrix4x4, aspectRatio, nearPlane, farPlane, fov);
 }
 
-R8void r8TexEnvi(R8enum param, R8int value)
+void r8BuildOrthogonalProjection(
+    R8float* matrix4x4, R8float width, R8float height, R8float nearPlane, R8float farPlane)
 {
-    r8StateMachineSetTexenvi(param, value);
+    r8_matrix_build_orthogonal((R8Matrix4*)matrix4x4, width, height, nearPlane, farPlane);
 }
 
-/****************************************************
- *                                                  *
- *             MVP and Transformations              *
- *                                                  *
- ****************************************************/
-
-R8void r8ModelMatrix(const R8float* matrix4x4)
+void r8Translate(R8float* matrix4x4, R8float x, R8float y, R8float z)
 {
-    r8StateMachineModelMatrix((R8Mat4*)matrix4x4);
+    r8_matrix_translate((R8Matrix4*)matrix4x4, x, y, z);
 }
 
-R8void r8ViewMatrix(const R8float* matrix4x4)
+void r8Rotate(R8float* matrix4x4, R8float x, R8float y, R8float z, R8float angle)
 {
-    r8StateMachineViewMatrix((R8Mat4*)matrix4x4);
+    r8_matrix_rotate((R8Matrix4*)matrix4x4, x, y, z, angle);
 }
 
-R8void r8ProjectionMatrix(const R8float* matrix4x4)
+void r8Scale(R8float* matrix4x4, R8float x, R8float y, R8float z)
 {
-    r8StateMachineProjectionMatrix((R8Mat4*)matrix4x4);
+    r8_matrix_scale((R8Matrix4*)matrix4x4, x, y, z);
 }
 
-R8void r8GeneratePerpspectiveMatrix(const R8float* matrix4x4, R8float fov, R8float aspectRatio, R8float nearPlane, R8float farPlane)
+void r8LoadIdentity(R8float* matrix4x4)
 {
-    r8Mat4Perspective((R8Mat4*)matrix4x4, fov, aspectRatio, nearPlane, farPlane);
-
+    r8_matrix_load_identity((R8Matrix4*)matrix4x4);
 }
 
-R8void r8GenerateOrthographicMatrix(const R8float* matrix4x4, R8float left, R8float right, R8float top, R8float bottom, R8float nearPlane, R8float farPlane)
+// --- states --- //
+
+void r8SetState(R8enum cap, R8boolean state)
 {
-    r8Mat4Orthographic((R8Mat4*)matrix4x4, left, right, top, bottom, nearPlane, farPlane);
+    r8_state_machine_set_state(cap, state);
 }
 
-R8void r8Translate(const R8float* matrix4x4, R8float x, R8float y, R8float z)
+R8boolean r8GetState(R8enum cap)
 {
-    r8Mat4Translation((R8Mat4*)matrix4x4, x, y, z);
+    return r8_state_machine_get_state(cap);
 }
 
-R8void r8Rotate(const R8float* matrix4x4, R8float x, R8float y, R8float z, R8float angle)
+void r8Enable(R8enum cap)
 {
-    r8Mat4Rotate((R8Mat4*)matrix4x4, x, y, z, angle);
-
+    r8_state_machine_set_state(cap, R8_TRUE);
 }
 
-R8void r8Scale(const R8float* matrix4x4, R8float x, R8float y, R8float z)
+void r8Disable(R8enum cap)
 {
-    r8Mat4Scale((R8Mat4*)matrix4x4, x, y, z);
+    r8_state_machine_set_state(cap, R8_FALSE);
 }
 
-R8void r8Identity(R8float* matrix4x4)
+void r8Viewport(R8int x, R8int y, R8int width, R8int height)
 {
-    r8Mat4LoadIdentity((R8Mat4*)matrix4x4);
+    r8_state_machine_viewport(x, y, width, height);
 }
 
-/****************************************************
- *                                                  *
- *                 Render States                    *
- *                                                  *
- ****************************************************/
-
-R8void r8SetState(R8enum cap, R8bool state)
+void r8Scissor(R8int x, R8int y, R8int width, R8int height)
 {
-    r8StateMachineSetState(cap, state);
+    r8_state_machine_scissor(x, y, width, height);
 }
 
-R8void r8Enable(R8enum functionality)
+void r8DepthRange(R8float minDepth, R8float maxDepth)
 {
-    r8StateMachineSetState(functionality, R8_TRUE);
+    r8_state_machine_depth_range(minDepth, maxDepth);
 }
 
-R8void r8Disable(R8enum functionality)
+void r8CullMode(R8enum mode)
 {
-    r8StateMachineSetState(functionality, R8_FALSE);
+    r8_state_machine_cull_mode(mode);
 }
 
-R8void r8CullMode(R8enum mode)
+void r8PolygonMode(R8enum mode)
 {
-    r8StateMachineCullMode(mode);
+    r8_state_machine_polygon_mode(mode);
 }
 
-R8void r8PolygonDrawMode(R8enum mode)
+// --- drawing --- //
+
+void r8ClearColor(R8ubyte r, R8ubyte g, R8ubyte b)
 {
-    r8StateMachinePolygonMode(mode);
+    R8_STATE_MACHINE.clearColor = r8_color_to_colorindex(r, g, b);
 }
 
-R8void r8SetDepthRange(R8float min, R8float max)
+void r8Color(R8ubyte r, R8ubyte g, R8ubyte b)
 {
-    r8StateMachineDepthRange(min, max);
+    R8_STATE_MACHINE.color0 = r8_color_to_colorindex(r, g, b);
 }
 
-R8void r8Viewport(R8int x, R8int y, R8int width, R8int height)
+void r8DrawScreenPoint(R8int x, R8int y)
 {
-    r8StateMachineViewport(x, y, width, height);
+    r8_render_screenspace_point(x, y);
 }
 
-R8void r8ScissorRect(R8int x, R8int y, R8int width, R8int height)
+void r8DrawScreenLine(R8int x1, R8int y1, R8int x2, R8int y2)
 {
-    r8StateMachineScissor(x, y, width, height);
+    r8_render_screenspace_line(x1, y1, x2, y2);
 }
 
-/****************************************************
- *                                                  *
- *                Drawing functions                 *
- *                                                  *
- ****************************************************/
-
-R8void r8ClearColor(R8ubyte r, R8ubyte g, R8ubyte b)
+void r8DrawScreenImage(R8int left, R8int top, R8int right, R8int bottom)
 {
-    R8_STATE_MACHINE.clearColor = r8RGBToColorBuffer(r, g, b);
+    r8_render_screenspace_image(left, top, right, bottom);
 }
 
-R8void r8BindColor(R8ubyte r, R8ubyte g, R8ubyte b)
+void r8Draw(R8enum priitives, R8ushort numVertices, R8ushort firstVertex)
 {
-    R8_STATE_MACHINE.color0 = r8RGBToColorBuffer(r, g, b);
-}
-
-R8void r8Draw(R8enum primitive, R8ushort verticesCount, R8ushort vertexOffset)
-{
-    switch (primitive)
+    switch (priitives)
     {
-    case R8_POINTS:
-        r8RenderPoints(verticesCount, vertexOffset, R8_STATE_MACHINE.vertexbuffer);
-        break;
+        case R8_POINTS:
+            r8_render_points(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer);
+            break;
 
-    case R8_LINES:
-        r8RenderLines(verticesCount, vertexOffset, R8_STATE_MACHINE.vertexbuffer);
-        break;
+        case R8_LINES:
+            r8_render_lines(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer);
+            break;
+        case R8_LINE_STRIP:
+            r8_render_line_strip(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer);
+            break;
+        case R8_LINE_LOOP:
+            r8_render_line_loop(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer);
+            break;
 
-    case R8_TRIANGLES:
-        r8RenderTriangles(verticesCount, vertexOffset, R8_STATE_MACHINE.vertexbuffer);
-        break;
-    case R8_TRIANGLES_STRIP:
-        r8RenderTrianglesStrip(verticesCount, vertexOffset, R8_STATE_MACHINE.vertexbuffer);
-        break;
+        case R8_TRIANGLES:
+            r8_render_triangles(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer);
+            break;
+        case R8_TRIANGLE_STRIP:
+            r8_render_triangle_strip(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer);
+            break;
+        case R8_TRIANGLE_FAN:
+            r8_render_triangle_fan(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer);
+            break;
 
-    default:
-        R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
-        break;
+        default:
+            R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
+            break;
     }
 }
 
-R8void r8DrawIndexed(R8enum primitive, R8ushort indicesCount, R8ushort indexOffset)
+void r8DrawIndexed(R8enum priitives, R8ushort numVertices, R8ushort firstVertex)
 {
-    switch (primitive)
+    switch (priitives)
     {
-    case R8_POINTS:
-        r8RenderIndexedPoints(indicesCount, indexOffset, R8_STATE_MACHINE.vertexbuffer, R8_STATE_MACHINE.indexbuffer);
-        break;
+        case R8_POINTS:
+            r8_render_indexed_points(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer, R8_STATE_MACHINE.boundIndexBuffer);
+            break;
 
-    case R8_LINES:
-        r8RenderLinesIndexed(indicesCount, indexOffset, R8_STATE_MACHINE.vertexbuffer, R8_STATE_MACHINE.indexbuffer);
-        break;
+        case R8_LINES:
+            r8_render_indexed_lines(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer, R8_STATE_MACHINE.boundIndexBuffer);
+            break;
+        case R8_LINE_STRIP:
+            r8_render_indexed_line_strip(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer, R8_STATE_MACHINE.boundIndexBuffer);
+            break;
+        case R8_LINE_LOOP:
+            r8_render_indexed_line_loop(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer, R8_STATE_MACHINE.boundIndexBuffer);
+            break;
 
-    case R8_TRIANGLES:
-        r8RenderIndexedTriangles(indicesCount, indexOffset, R8_STATE_MACHINE.vertexbuffer, R8_STATE_MACHINE.indexbuffer);
-        break;
-    case R8_TRIANGLES_STRIP:
-        r8RenderIndexedTrianglesStrip(indicesCount, indexOffset, R8_STATE_MACHINE.vertexbuffer, R8_STATE_MACHINE.indexbuffer);
-        break;
+        case R8_TRIANGLES:
+            r8_render_indexed_triangles(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer, R8_STATE_MACHINE.boundIndexBuffer);
+            break;
+        case R8_TRIANGLE_STRIP:
+            r8_render_indexed_triangle_strip(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer, R8_STATE_MACHINE.boundIndexBuffer);
+            break;
+        case R8_TRIANGLE_FAN:
+            r8_render_indexed_triangle_fan(numVertices, firstVertex, R8_STATE_MACHINE.boundVertexBuffer, R8_STATE_MACHINE.boundIndexBuffer);
+            break;
 
-    default:
-        R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
-        break;
+        default:
+            R8_ERROR(R8_ERROR_INVALID_ARGUMENT);
+            break;
     }
 }
 
-//----------------Drawing utility functions--------------
+// --- immediate mode --- //
 
-R8void r8DrawPoint(R8float x, R8float y)
+void r8Begin(R8enum priitives)
 {
-    r8RenderScreenSpacePoint(x, y);
+    r8_immediate_mode_begin(priitives);
 }
 
-R8void r8DrawLine(R8float x1, R8float y1, R8float x2, R8float y2)
+void r8End()
 {
-    r8RenderScreenSpaceLine(x1, y1, x2, y2);
-
+    r8_immediate_mode_end();
 }
 
-R8void r8DrawTexture(R8int left, R8int top, R8int right, R8int bottom)
+void r8TexCoord2f(R8float u, R8float v)
 {
-    r8RenderScreenSpaceImage(left, top, right, bottom);
+    r8_immediate_mode_texcoord(u, v);
 }
 
-/****************************************************
- *                                                  *
- *              Immediate mode Drawing              *
- *                                                  *
- ****************************************************/
-
-R8void r8Begin(R8enum primitive)
+void r8TexCoord2i(R8int u, R8int v)
 {
-    r8ImmediateModeBegin(primitive);
+    r8_immediate_mode_texcoord((R8float)u, (R8float)v);
 }
 
-R8void r8End()
+void r8Vertex4f(R8float x, R8float y, R8float z, R8float w)
 {
-    r8ImmediateModeEnd();
+    r8_immediate_mode_vertex(x, y, z, w);
 }
 
-R8void r8Vertex2f(R8float x, R8float y)
+void r8Vertex4i(R8int x, R8int y, R8int z, R8int w)
 {
-    r8ImmediateModeVertex(x, y, 0.0f, 1.0f);
+    r8_immediate_mode_vertex((R8float)x, (R8float)y, (R8float)z, (R8float)w);
 }
 
-R8void r8Vertex3f(R8float x, R8float y, R8float z)
+void r8Vertex3f(R8float x, R8float y, R8float z)
 {
-    r8ImmediateModeVertex(x, y, z, 1.0f);
+    r8_immediate_mode_vertex(x, y, z, 1.0f);
 }
 
-R8void r8Vertex4f(R8float x, R8float y, R8float z, R8float w)
+void r8Vertex3i(R8int x, R8int y, R8int z)
 {
-    r8ImmediateModeVertex(x, y, z, w);
+    r8_immediate_mode_vertex((R8float)x, (R8float)y, (R8float)z, 1.0f);
 }
 
-R8void r8TexCoord2f(R8float s, R8float t)
+void r8Vertex2f(R8float x, R8float y)
 {
-    r8ImmediateModeTexCoord(s, t);
+    r8_immediate_mode_vertex(x, y, 0.0f, 1.0f);
 }
 
-R8void r8VertexColor4f(R8float r, R8float g, R8float b, R8float a)
+void r8Vertex2i(R8int x, R8int y)
 {
-    // TODO: To be implemented
+    r8_immediate_mode_vertex((R8float)x, (R8float)y, 0.0f, 1.0f);
 }
+

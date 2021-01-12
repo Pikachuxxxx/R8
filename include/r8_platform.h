@@ -1,20 +1,26 @@
-/* r8_platform.h
+/*
+ * r8_platform.h
  *
  * This file is part of the "R8" (Copyright(c) 2021 by Phani Srikar (Pikachuxxxx))
  * See "LICENSE.txt" for license information.
  */
 
-#ifndef R_8_PLATFORM_H
-#define R_8_PLATFORM_H
+#ifndef R8_PLATFORM_H
+#define R8_PLATFORM_H
 
-typedef struct R8ContextDesc
+
+/// Render context description structure.
+typedef struct R8contextdesc
 {
-    /*
-     * For Win32, window type : 'const HWND*'
-     * For MacOS, window type : 'const NSWindow*'
-     * For Linux, window type : 'const Window*'
-     */
+    /**
+     * Reference to the OS dependent window.
+    - For Win32, this must be from type 'const HWND*'
+    - For MacOS, this must be from type 'const NSWindow*'
+    - For Linux, this must be from type 'const Window*'
+    */
     const void* window;
-}R8ContextDesc;
+}
+R8contextdesc;
+
 
 #endif
